@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { reduceMotion, restoreMotion } from "antd-mobile";
 import { clearRecovery, deleteProject, getRecovery, listProjects, saveProject, saveRecovery } from "./db";
 import { createProject } from "./defaultProject";
 import { ChatEditorPage } from "./pages/ChatEditorPage";
@@ -29,6 +30,14 @@ export default function App() {
   useEffect(() => {
     void refreshDrafts();
     void getRecovery().then(setRecovery).catch(() => setStorageError("未能读取自动恢复内容"));
+  }, []);
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotion = () => preference.matches ? reduceMotion() : restoreMotion();
+    syncMotion();
+    preference.addEventListener("change", syncMotion);
+    return () => preference.removeEventListener("change", syncMotion);
   }, []);
 
   useEffect(() => {

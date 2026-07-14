@@ -1,4 +1,5 @@
 import type { AssetRecord, ChatProject, RecoveryRecord } from "./types";
+import { migrateChatProject } from "./features/chat/model/chatMigration";
 
 const DB_NAME = "faksy";
 const DB_VERSION = 1;
@@ -58,13 +59,13 @@ export async function listProjects(): Promise<ChatProject[]> {
   const projects = await requestToPromise(
     transaction.objectStore("projects").getAll() as IDBRequest<ChatProject[]>,
   );
-  return projects.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return projects.map(migrateChatProject).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function saveProject(project: ChatProject): Promise<void> {
   const database = await openFaksyDB();
   const transaction = database.transaction("projects", "readwrite");
-  transaction.objectStore("projects").put(project);
+  transaction.objectStore("projects").put(migrateChatProject(project));
   await transactionDone(transaction);
 }
 
@@ -114,7 +115,7 @@ export async function saveRecovery(project: ChatProject): Promise<void> {
   const transaction = database.transaction("recovery", "readwrite");
   const record: RecoveryRecord = {
     id: "current",
-    project,
+    project: migrateChatProject(project),
     savedAt: new Date().toISOString(),
   };
   transaction.objectStore("recovery").put(record);
@@ -124,9 +125,10 @@ export async function saveRecovery(project: ChatProject): Promise<void> {
 export async function getRecovery(): Promise<RecoveryRecord | undefined> {
   const database = await openFaksyDB();
   const transaction = database.transaction("recovery", "readonly");
-  return requestToPromise(
+  const recovery = await requestToPromise(
     transaction.objectStore("recovery").get("current") as IDBRequest<RecoveryRecord | undefined>,
   );
+  return recovery ? { ...recovery, project: migrateChatProject(recovery.project) } : undefined;
 }
 
 export async function clearRecovery(): Promise<void> {

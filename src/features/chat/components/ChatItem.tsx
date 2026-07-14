@@ -1,4 +1,5 @@
 import type { ChatItem, ChatProject, MessageItem, Participant } from "../../../types";
+import { formatTimeOfDay, formatTimeSegment } from "../model/localDateTime";
 
 function Avatar({ participant, assetUrls }: { participant: Participant; assetUrls: Record<string, string> }) {
   const imageUrl = participant.avatarAssetId ? assetUrls[participant.avatarAssetId] : undefined;
@@ -13,6 +14,10 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
   const participant = project.content.participants.find((person) => person.id === item.senderId);
   if (!participant) return null;
   const own = participant.id === project.content.currentParticipantId;
+  const segment = project.content.items.find(
+    (entry) => entry.kind === "time-divider" && entry.id === item.timeSegmentId,
+  );
+  const time = segment?.kind === "time-divider" ? formatTimeOfDay(segment.timestamp) : undefined;
 
   return (
     <div className={`chat-message ${own ? "is-own" : "is-other"}`}>
@@ -20,8 +25,8 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
       <div className="bubble-stack">
         {project.content.showUsernames ? <span className="message-name">{participant.displayName}</span> : null}
         <div className="message-bubble" style={{ backgroundColor: participant.bubbleColor, color: participant.textColor }}>
-          {item.content || "空消息"}
-          {project.content.templateId === "whatsapp" ? <span className="message-time">16:28 ✓✓</span> : null}
+          {item.content}
+          {time ? <span className="message-time">{time}{project.content.templateId === "whatsapp" ? " ✓✓" : ""}</span> : null}
         </div>
       </div>
       {own ? <Avatar participant={participant} assetUrls={assetUrls} /> : null}
@@ -30,6 +35,6 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
 }
 
 export function ChatItemBlock({ item, project, assetUrls }: { item: ChatItem; project: ChatProject; assetUrls: Record<string, string> }) {
-  if (item.kind === "time-divider") return <div className="time-divider">{item.label}</div>;
+  if (item.kind === "time-divider") return <div className="time-divider">{formatTimeSegment(item.timestamp, project.content.referenceDate)}</div>;
   return <MessageBlock item={item} project={project} assetUrls={assetUrls} />;
 }

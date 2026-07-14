@@ -24,6 +24,7 @@ export interface MessageItem {
   id: string;
   kind: "message";
   senderId: string;
+  timeSegmentId: string;
   messageType: "text" | "image" | "sticker";
   content: string;
 }
@@ -31,7 +32,9 @@ export interface MessageItem {
 export interface TimeDividerItem {
   id: string;
   kind: "time-divider";
-  label: string;
+  timestamp: string | null;
+  legacyLabel?: string;
+  requiresConfirmation?: true;
 }
 
 export type ChatItem = MessageItem | TimeDividerItem;
@@ -40,6 +43,7 @@ export interface ChatDocument {
   templateId: TemplateId;
   conversationTitle: string;
   currentParticipantId: string;
+  referenceDate: string;
   participants: Participant[];
   items: ChatItem[];
   showUsernames: boolean;

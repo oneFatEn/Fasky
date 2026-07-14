@@ -1,5 +1,7 @@
 import { CHAT_TEMPLATES, EXPORT_HEIGHT, EXPORT_PIXEL_RATIO, EXPORT_WIDTH } from "./templates";
 import type { ChatProject, TemplateId } from "./types";
+import { CHAT_SCHEMA_VERSION } from "./features/chat/model/chatMigration";
+import { formatLocalDate, formatLocalDateTime } from "./features/chat/model/localDateTime";
 
 const makeId = () => crypto.randomUUID();
 
@@ -8,10 +10,13 @@ export function createProject(templateId: TemplateId): ChatProject {
   const template = CHAT_TEMPLATES[templateId];
   const currentParticipantId = makeId();
   const otherParticipantId = makeId();
+  const timeSegmentId = makeId();
+  const referenceDate = formatLocalDate(new Date());
+  const timestamp = formatLocalDateTime(new Date(`${referenceDate}T16:28`));
 
   return {
     id: makeId(),
-    schemaVersion: 1,
+    schemaVersion: CHAT_SCHEMA_VERSION,
     type: "chat",
     title: "周末逃跑计划",
     createdAt,
@@ -20,6 +25,7 @@ export function createProject(templateId: TemplateId): ChatProject {
       templateId,
       conversationTitle: "乔屿",
       currentParticipantId,
+      referenceDate,
       showUsernames: false,
       participants: [
         {
@@ -36,11 +42,12 @@ export function createProject(templateId: TemplateId): ChatProject {
         },
       ],
       items: [
-        { id: makeId(), kind: "time-divider", label: "今天 16:28" },
+        { id: timeSegmentId, kind: "time-divider", timestamp },
         {
           id: makeId(),
           kind: "message",
           senderId: otherParticipantId,
+          timeSegmentId,
           messageType: "text",
           content: "我找到一家离海很近的民宿，窗户推开就是风。",
         },
@@ -48,6 +55,7 @@ export function createProject(templateId: TemplateId): ChatProject {
           id: makeId(),
           kind: "message",
           senderId: currentParticipantId,
+          timeSegmentId,
           messageType: "text",
           content: "订。周五下班直接走。",
         },
@@ -55,6 +63,7 @@ export function createProject(templateId: TemplateId): ChatProject {
           id: makeId(),
           kind: "message",
           senderId: otherParticipantId,
+          timeSegmentId,
           messageType: "text",
           content: "我带相机。",
         },

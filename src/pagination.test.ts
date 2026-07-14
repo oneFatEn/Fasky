@@ -3,9 +3,9 @@ import { assertStablePagination, OversizedItemError, paginateItems } from "./pag
 import type { ChatItem } from "./types";
 
 const items: ChatItem[] = [
-  { id: "time", kind: "time-divider", label: "今天" },
-  { id: "one", kind: "message", senderId: "a", messageType: "text", content: "一" },
-  { id: "two", kind: "message", senderId: "b", messageType: "text", content: "二" },
+  { id: "time", kind: "time-divider", timestamp: "2026-07-14T16:28" },
+  { id: "one", kind: "message", senderId: "a", timeSegmentId: "time", messageType: "text", content: "一" },
+  { id: "two", kind: "message", senderId: "b", timeSegmentId: "time", messageType: "text", content: "二" },
 ];
 
 describe("paginateItems", () => {

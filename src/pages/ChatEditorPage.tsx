@@ -1,8 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { DatePicker } from "antd-mobile";
 import {
   ArrowLeft,
+  CalendarBlank,
   ChatCircleDots,
   Check,
+  Clock,
   DownloadSimple,
   ImageSquare,
   Plus,
@@ -17,15 +20,23 @@ import { ChatCanvas } from "../features/chat/ChatCanvas";
 import { useAssetUrls } from "../features/chat/useAssetUrls";
 import { useProjectAssets } from "../features/chat/hooks/useProjectAssets";
 import {
+  addTimeSegment,
+  appendMessageToTimeSegment,
   applyTemplate,
   findMessage,
   findParticipant,
-  insertChatItem,
   updateChatProject,
 } from "../features/chat/model/chatActions";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+  parseLocalDate,
+  parseLocalDateTime,
+} from "../features/chat/model/localDateTime";
 import { ExportRenderTree, MeasureRenderTree } from "../features/export/ExportRenderTree";
 import { useChatExport } from "../features/export/hooks/useChatExport";
-import type { ChatItem, ChatProject, EditorTab, TemplateId } from "../types";
+import { EditorSheet } from "../shared/EditorSheet";
+import type { ChatProject, EditorTab, TemplateId } from "../types";
 
 interface ChatEditorPageProps {
   project: ChatProject;
@@ -35,51 +46,96 @@ interface ChatEditorPageProps {
   onSave: () => Promise<void>;
 }
 
-interface DeletedItem {
-  item: ChatItem;
-  index: number;
-}
+type PickerState =
+  | { kind: "new-time"; value: Date }
+  | { kind: "new-time-with-message"; value: Date }
+  | { kind: "edit-time"; value: Date; segmentId: string }
+  | { kind: "reference-date"; value: Date };
 
-const makeId = () => crypto.randomUUID();
+const sheetTitles: Record<EditorTab, string> = {
+  content: "编辑内容",
+  people: "编辑人物",
+  style: "编辑样式",
+  canvas: "编辑画布",
+};
 
 export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: ChatEditorPageProps) {
   const [tab, setTab] = useState<EditorTab>("content");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [picker, setPicker] = useState<PickerState>({ kind: "new-time", value: new Date() });
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState("");
-  const undoRef = useRef<DeletedItem | undefined>(undefined);
   const assetUrls = useAssetUrls(project);
   const saveImage = useProjectAssets(project.id, setNotice);
   const { pages, results, exporting, oversizedId, exportImages } = useChatExport({ project, assetUrls, onNotice: setNotice });
   const participants = project.content.participants;
   const pageEstimate = useMemo(() => Math.max(1, Math.ceil(project.content.items.length / 8)), [project.content.items.length]);
+  const currentParticipant = participants.find((person) => person.id === project.content.currentParticipantId);
 
   const change = (mutate: (draft: ChatProject) => void) => onChange((current) => updateChatProject(current, mutate));
+  const openPicker = (nextPicker: PickerState) => {
+    setPicker(nextPicker);
+    setPickerOpen(true);
+  };
 
   const deleteItem = (id: string) => {
+    let deletedSegment = false;
     change((draft) => {
-      const index = draft.content.items.findIndex((item) => item.id === id);
-      if (index >= 0) {
-        const [item] = draft.content.items.splice(index, 1);
-        if (item) undoRef.current = { item, index };
-      }
+      const target = draft.content.items.find((item) => item.id === id);
+      deletedSegment = target?.kind === "time-divider";
+      draft.content.items = deletedSegment
+        ? draft.content.items.filter((item) => item.id !== id && (item.kind !== "message" || item.timeSegmentId !== id))
+        : draft.content.items.filter((item) => item.id !== id);
     });
-    setNotice("已删除一条内容");
+    setNotice(deletedSegment ? "已删除时间段及其气泡" : "已删除一条消息");
   };
 
-  const restoreDeletedItem = () => {
-    const deleted = undoRef.current;
-    if (!deleted) return;
-    change((draft) => insertChatItem(draft, deleted.item, deleted.index));
-    undoRef.current = undefined;
-    setNotice("");
+  const addMessage = (timeSegmentId: string, senderId: string) => {
+    change((draft) => { appendMessageToTimeSegment(draft, timeSegmentId, senderId); });
   };
 
-  const addMessage = () => {
-    const senderId = participants[0]?.id;
-    if (!senderId) return;
-    change((draft) => {
-      draft.content.items.push({ id: makeId(), kind: "message", senderId, messageType: "text", content: "输入新的消息" });
+  const addMessageToLatestSegment = () => {
+    if (!currentParticipant) return;
+    const segment = [...project.content.items].reverse().find((item) => item.kind === "time-divider");
+    if (!segment) {
+      openPicker({ kind: "new-time-with-message", value: new Date() });
+      return;
+    }
+    addMessage(segment.id, currentParticipant.id);
+  };
+
+  const openTimeEditor = (segmentId: string) => {
+    const segment = project.content.items.find((item) => item.kind === "time-divider" && item.id === segmentId);
+    const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
+    referenceDate.setHours(12, 0, 0, 0);
+    openPicker({
+      kind: "edit-time",
+      segmentId,
+      value: segment?.kind === "time-divider" ? parseLocalDateTime(segment.timestamp) ?? referenceDate : referenceDate,
     });
-    setTab("content");
+  };
+
+  const confirmPicker = (value: Date) => {
+    if (picker.kind === "reference-date") {
+      change((draft) => { draft.content.referenceDate = formatLocalDate(value); });
+    } else if (picker.kind === "edit-time") {
+      change((draft) => {
+        const item = draft.content.items.find((entry) => entry.kind === "time-divider" && entry.id === picker.segmentId);
+        if (item?.kind === "time-divider") {
+          item.timestamp = formatLocalDateTime(value);
+          delete item.legacyLabel;
+          delete item.requiresConfirmation;
+        }
+      });
+    } else {
+      change((draft) => {
+        const segment = addTimeSegment(draft, formatLocalDateTime(value));
+        if (picker.kind === "new-time-with-message") {
+          appendMessageToTimeSegment(draft, segment.id, draft.content.currentParticipantId);
+        }
+      });
+    }
+    setPickerOpen(false);
   };
 
   const uploadAvatar = async (participantId: string, file?: File) => {
@@ -110,15 +166,33 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
         <div className="phone-scaler"><ChatCanvas project={project} assetUrls={assetUrls} onDelete={deleteItem} oversizedId={oversizedId} /></div>
       </section>
 
-      <section className="editor-panel editor-footer">
-        <EditorTabs tab={tab} onChange={setTab} />
-        <div className="panel-body">
+      <footer className="editor-footer">
+        <EditorTabs
+          tab={sheetOpen ? tab : undefined}
+          onChange={(nextTab) => { setTab(nextTab); setSheetOpen(true); }}
+          exporting={exporting}
+          onExport={() => void exportImages()}
+        />
+      </footer>
+
+      {notice ? <div className="editor-notice" role="status">{notice}<button onClick={() => setNotice("")} type="button">关闭</button></div> : null}
+
+        <EditorSheet open={sheetOpen} title={sheetTitles[tab]} closeLabel={`关闭${sheetTitles[tab]}`} returnFocusId={`editor-tab-${tab}`} onClose={() => setSheetOpen(false)}
+          barActions={tab === "content" ? (
+            <>
+              <button onClick={addMessageToLatestSegment} type="button"><Plus size={16} weight="bold" />气泡</button>
+              <button onClick={() => openPicker({ kind: "new-time", value: new Date() })} type="button"><Clock size={16} />时间</button>
+              <button onClick={() => openPicker({ kind: "reference-date", value: parseLocalDate(project.content.referenceDate) ?? new Date() })} aria-label="设置今天" type="button"><CalendarBlank size={18} /></button>
+            </>
+          ) : undefined}
+        >
           {tab === "content" ? (
             <MessageEditor
               items={project.content.items}
               participants={participants}
-              onAddTime={() => change((draft) => { draft.content.items.push({ id: makeId(), kind: "time-divider", label: "今天 18:30" }); })}
-              onChangeTime={(id, label) => change((draft) => { const item = draft.content.items.find((entry) => entry.id === id); if (item?.kind === "time-divider") item.label = label; })}
+              currentParticipantId={project.content.currentParticipantId}
+              onAddMessage={addMessage}
+              onEditTime={openTimeEditor}
               onChangeMessage={(id, patch) => change((draft) => { const item = findMessage(draft, id); if (item) Object.assign(item, patch); })}
               onDelete={deleteItem}
             />
@@ -144,11 +218,20 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
             />
           ) : null}
           {tab === "canvas" ? <CanvasEditor appearance={project.theme.appearance} pageEstimate={pageEstimate} onAppearanceChange={(appearance) => change((draft) => { draft.theme.appearance = appearance; })} /> : null}
-        </div>
+        </EditorSheet>
 
-        {notice ? <div className="editor-notice" role="status">{notice}{undoRef.current ? <button onClick={restoreDeletedItem} type="button">撤销</button> : null}</div> : null}
-        <div className="editor-actions"><button className="secondary-action" onClick={addMessage} type="button"><Plus size={18} weight="bold" />添加消息</button><button className="primary-action" disabled={exporting || project.content.items.length === 0} onClick={() => void exportImages()} type="button"><DownloadSimple size={18} weight="bold" />{exporting ? "生成中" : "导出图片"}</button></div>
-      </section>
+      <DatePicker
+        visible={pickerOpen}
+        value={picker.value}
+        precision={picker.kind === "reference-date" ? "day" : "minute"}
+        title={picker.kind === "reference-date" ? "设置虚构对话中的今天" : "选择日期和时间"}
+        min={new Date(2000, 0, 1)}
+        max={new Date(2100, 11, 31, 23, 59)}
+        closeOnMaskClick={false}
+        onConfirm={confirmPicker}
+        onCancel={() => setPickerOpen(false)}
+        onClose={() => setPickerOpen(false)}
+      />
 
       {results.length > 0 ? <section className="export-results"><div><span>导出完成</span><strong>{results.length} 张图片，逻辑高度均为 {project.export.height}px</strong></div><div>{results.map((result, index) => <a href={result.url} download={result.fileName} key={result.url}>下载第 {index + 1} 张</a>)}</div></section> : null}
       <MeasureRenderTree project={project} assetUrls={assetUrls} />
@@ -157,7 +240,17 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   );
 }
 
-function EditorTabs({ tab, onChange }: { tab: EditorTab; onChange: (tab: EditorTab) => void }) {
+function EditorTabs({
+  tab,
+  onChange,
+  exporting,
+  onExport,
+}: {
+  tab?: EditorTab;
+  onChange: (tab: EditorTab) => void;
+  exporting: boolean;
+  onExport: () => void;
+}) {
   const tabs = [
     ["content", ChatCircleDots, "内容"],
     ["people", UserCircle, "人物"],
@@ -165,10 +258,11 @@ function EditorTabs({ tab, onChange }: { tab: EditorTab; onChange: (tab: EditorT
     ["canvas", ImageSquare, "画布"],
   ] as const;
   return (
-    <div className="editor-tabs" role="tablist" aria-label="编辑区域">
+    <div className="editor-tabs" role="toolbar" aria-label="编辑与导出">
       {tabs.map(([id, Icon, label]) => (
-        <button className={tab === id ? "active" : ""} onClick={() => onChange(id)} role="tab" aria-selected={tab === id} type="button" key={id}><Icon size={18} weight={tab === id ? "fill" : "regular"} />{label}</button>
+        <button id={`editor-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => onChange(id)} aria-pressed={tab === id} type="button" key={id}><Icon size={19} weight={tab === id ? "fill" : "regular"} />{label}</button>
       ))}
+      <button className="export-tab" disabled={exporting} onClick={onExport} type="button"><DownloadSimple size={19} weight="bold" />{exporting ? "生成中" : "导出图片"}</button>
     </div>
   );
 }

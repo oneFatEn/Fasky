@@ -3,6 +3,7 @@ import { toBlob } from "html-to-image";
 import { assertStablePagination, OversizedItemError, paginateItems } from "../../../pagination";
 import { EXPORT_MESSAGE_CAPACITY } from "../../../templates";
 import type { ChatItem, ChatProject, ExportResult } from "../../../types";
+import { hasUnresolvedTimeSegments } from "../../chat/model/chatMigration";
 
 const waitForPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
@@ -38,6 +39,7 @@ export function useChatExport({ project, assetUrls, onNotice }: UseChatExportOpt
     setOversizedId(undefined);
     try {
       if (project.content.items.length === 0) throw new Error("至少添加一条内容后再导出");
+      if (hasUnresolvedTimeSegments(project)) throw new Error("请先确认所有旧时间段的日期时间再导出");
       await document.fonts?.ready;
       await waitForAssetImages(assetUrls);
       await waitForPaint();

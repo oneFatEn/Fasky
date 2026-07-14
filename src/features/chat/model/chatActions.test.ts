@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject } from "../../../defaultProject";
-import { applyTemplate, insertChatItem, updateChatProject } from "./chatActions";
+import { appendMessageToTimeSegment, applyTemplate, insertChatItem, updateChatProject } from "./chatActions";
 import { CHAT_TEMPLATES } from "../../../templates";
 
 describe("chat actions", () => {
@@ -28,5 +28,38 @@ describe("chat actions", () => {
     expect(project.content.templateId).toBe("whatsapp");
     expect(current?.bubbleColor).toBe(CHAT_TEMPLATES.whatsapp.ownBubble);
     expect(other?.bubbleColor).toBe(CHAT_TEMPLATES.whatsapp.otherBubble);
+  });
+
+  it("inserts a blank message at the end of its time segment", () => {
+    const project = createProject("wechat");
+    const firstSegment = project.content.items.find((item) => item.kind === "time-divider");
+    expect(firstSegment).toBeDefined();
+    if (!firstSegment) return;
+    const secondSegmentId = crypto.randomUUID();
+    project.content.items.push({
+      id: secondSegmentId,
+      kind: "time-divider",
+      timestamp: "2026-07-15T09:00",
+    });
+    const senderId = project.content.currentParticipantId;
+    const message = appendMessageToTimeSegment(project, firstSegment.id, senderId);
+    const secondSegmentIndex = project.content.items.findIndex((item) => item.id === secondSegmentId);
+    expect(project.content.items[secondSegmentIndex - 1]?.id).toBe(message.id);
+    expect(message).toMatchObject({ senderId, timeSegmentId: firstSegment.id, content: "" });
+  });
+
+  it("uses the requested participant for left and right segment insertion", () => {
+    const project = createProject("whatsapp");
+    const segment = project.content.items.find((item) => item.kind === "time-divider");
+    const current = project.content.currentParticipantId;
+    const other = project.content.participants.find((person) => person.id !== current)?.id;
+    expect(segment && other).toBeTruthy();
+    if (!segment || !other) return;
+    const left = appendMessageToTimeSegment(project, segment.id, other);
+    const right = appendMessageToTimeSegment(project, segment.id, current);
+    expect(left.senderId).toBe(other);
+    expect(right.senderId).toBe(current);
+    expect(left.timeSegmentId).toBe(segment.id);
+    expect(right.timeSegmentId).toBe(segment.id);
   });
 });
