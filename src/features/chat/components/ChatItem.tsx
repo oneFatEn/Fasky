@@ -1,3 +1,4 @@
+import { Checks } from "@phosphor-icons/react";
 import type { ChatItem, ChatProject, MessageItem, Participant } from "../../../types";
 import { formatTimeOfDay, formatTimeSegment } from "../model/localDateTime";
 
@@ -25,8 +26,15 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
       <div className="bubble-stack">
         {project.content.showUsernames ? <span className="message-name">{participant.displayName}</span> : null}
         <div className="message-bubble" style={{ backgroundColor: participant.bubbleColor, color: participant.textColor }}>
-          {item.content}
-          {time ? <span className="message-time">{time}{project.content.templateId === "whatsapp" ? " ✓✓" : ""}</span> : null}
+          <span className="message-content">{item.content}</span>
+          {time ? (
+            <span className="message-meta">
+              <span className="message-time">{time}</span>
+              {project.content.templateId === "whatsapp" ? (
+                <Checks className="message-status" size={10} weight="bold" aria-label="已读" />
+              ) : null}
+            </span>
+          ) : null}
         </div>
       </div>
       {own ? <Avatar participant={participant} assetUrls={assetUrls} /> : null}

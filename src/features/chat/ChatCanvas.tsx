@@ -51,8 +51,19 @@ export function ChatCanvas({
           >
             <ChatItemBlock item={item} project={project} assetUrls={assetUrls} />
             {mode === "editor" && onDelete ? (
-              <button className="row-delete" aria-label="删除这一条" onClick={() => onDelete(item.id)} type="button">
-                <Trash size={14} weight="bold" />
+              <button
+                className={`row-delete ${
+                  item.kind === "time-divider"
+                    ? "row-delete-divider"
+                    : item.senderId === project.content.currentParticipantId
+                      ? "row-delete-own"
+                      : "row-delete-other"
+                }`}
+                aria-label="删除这一条"
+                onClick={() => onDelete(item.id)}
+                type="button"
+              >
+                <Trash size={8} weight="bold" />
               </button>
             ) : null}
           </div>

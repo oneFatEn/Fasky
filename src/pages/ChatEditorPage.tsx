@@ -79,15 +79,13 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   };
 
   const deleteItem = (id: string) => {
-    let deletedSegment = false;
     change((draft) => {
       const target = draft.content.items.find((item) => item.id === id);
-      deletedSegment = target?.kind === "time-divider";
+      const deletedSegment = target?.kind === "time-divider";
       draft.content.items = deletedSegment
         ? draft.content.items.filter((item) => item.id !== id && (item.kind !== "message" || item.timeSegmentId !== id))
         : draft.content.items.filter((item) => item.id !== id);
     });
-    setNotice(deletedSegment ? "已删除时间段及其气泡" : "已删除一条消息");
   };
 
   const addMessage = (timeSegmentId: string, senderId: string) => {
@@ -220,18 +218,20 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
           {tab === "canvas" ? <CanvasEditor appearance={project.theme.appearance} pageEstimate={pageEstimate} onAppearanceChange={(appearance) => change((draft) => { draft.theme.appearance = appearance; })} /> : null}
         </EditorSheet>
 
-      <DatePicker
-        visible={pickerOpen}
-        value={picker.value}
-        precision={picker.kind === "reference-date" ? "day" : "minute"}
-        title={picker.kind === "reference-date" ? "设置虚构对话中的今天" : "选择日期和时间"}
-        min={new Date(2000, 0, 1)}
-        max={new Date(2100, 11, 31, 23, 59)}
-        closeOnMaskClick={false}
-        onConfirm={confirmPicker}
-        onCancel={() => setPickerOpen(false)}
-        onClose={() => setPickerOpen(false)}
-      />
+      {pickerOpen ? (
+        <DatePicker
+          visible
+          value={picker.value}
+          precision={picker.kind === "reference-date" ? "day" : "minute"}
+          title={picker.kind === "reference-date" ? "设置虚构对话中的今天" : "选择日期和时间"}
+          min={new Date(2000, 0, 1)}
+          max={new Date(2100, 11, 31, 23, 59)}
+          closeOnMaskClick={false}
+          onConfirm={confirmPicker}
+          onCancel={() => setPickerOpen(false)}
+          onClose={() => setPickerOpen(false)}
+        />
+      ) : null}
 
       {results.length > 0 ? <section className="export-results"><div><span>导出完成</span><strong>{results.length} 张图片，逻辑高度均为 {project.export.height}px</strong></div><div>{results.map((result, index) => <a href={result.url} download={result.fileName} key={result.url}>下载第 {index + 1} 张</a>)}</div></section> : null}
       <MeasureRenderTree project={project} assetUrls={assetUrls} />

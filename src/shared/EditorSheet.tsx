@@ -43,7 +43,7 @@ export function EditorSheet({
     <Popup
       visible={open}
       position="bottom"
-      closeOnMaskClick={false}
+      closeOnMaskClick
       closeOnSwipe={false}
       destroyOnClose
       bodyClassName="editor-sheet-popup"
