@@ -114,7 +114,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .preview-meta small { font-size: 9px; font-weight: 500; }
 .phone-scaler { width: 100%; height: 100%; min-height: 0; max-width: 390px; margin: 0 auto; }
 
-.chat-phone { width: 100%; height: 100%; min-height: 0; display: grid; grid-template-rows: 26px 52px minmax(0, 1fr) 54px; color: #202321; border-radius: var(--radius-panel); background: var(--chat-background); background-position: center; background-size: cover; overflow: hidden; box-shadow: 0 18px 46px rgba(48,44,38,.18); }
+.chat-phone { position: relative; isolation: isolate; width: 100%; height: 100%; min-height: 0; display: grid; grid-template-rows: 26px 52px minmax(0, 1fr) 54px; color: #202321; border-radius: var(--radius-panel); background: var(--chat-background); overflow: hidden; box-shadow: 0 18px 46px rgba(48,44,38,.18); }
+.chat-phone > :not(.chat-background-image) { position: relative; z-index: 1; }
+.chat-background-image { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; user-select: none; }
 .phone-status { padding: 0 14px; display: flex; align-items: center; justify-content: space-between; background: rgba(246,246,244,.88); font-size: 10px; }
 .phone-status span { display: flex; align-items: center; gap: 4px; }
 .conversation-bar { padding: 0 13px; display: grid; grid-template-columns: 28px 1fr 28px; align-items: center; border-bottom: 1px solid rgba(32,35,33,.08); background: rgba(246,246,244,.93); }
@@ -123,8 +125,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .conversation-bar span { color: #737873; font-size: 8px; }
 .chat-stream { min-height: 0; padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .chat-item-wrap { position: relative; padding: 0; }
-.time-divider { width: max-content; margin: 0 auto; padding: 3px 8px; border-radius: 6px; color: #70746f; background: rgba(255,255,255,.48); font-size: 9px; }
-.event-divider { width: fit-content; max-width: 82%; margin: 0 auto; padding: 5px 10px; border-radius: 6px; color: #5b6251; background: rgba(255,255,255,.62); font-size: 9px; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
+.time-divider { width: max-content; margin: 0 auto; padding: 3px 8px; border-radius: 6px; color: #4f554f; background: rgba(222,225,221,.82); font-size: 9px; }
+.event-divider { width: fit-content; max-width: 82%; margin: 0 auto; padding: 5px 10px; border-radius: 6px; color: #41483f; background: rgba(214,219,212,.9); font-size: 9px; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
 .chat-message { display: flex; align-items: flex-start; gap: 7px; }
 .chat-message.is-own { justify-content: flex-end; }
 .chat-avatar { flex: 0 0 auto; color: #fff; background: #5d756e; font-size: 13px; font-weight: 800; overflow: hidden; }
@@ -154,6 +156,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .is-dark .conversation-bar { border-color: rgba(255,255,255,.1); }
 .is-dark .conversation-bar span, .is-dark .message-name { color: #b4b9b3; }
 .is-dark .conversation-input { color: #b8bdb7; background: rgba(36,40,38,.94); }
+.is-dark .time-divider { color: #edf0e8; background: rgba(42,47,42,.84); }
+.is-dark .event-divider { color: #f1f3ed; background: rgba(35,40,35,.9); }
 
 .editor-panel { position: relative; min-height: 0; max-height: min(50dvh, 430px); margin-top: -4px; padding: 10px 14px calc(16px + env(safe-area-inset-bottom)); border-radius: var(--radius-panel) var(--radius-panel) 0 0; overflow-y: auto; overscroll-behavior: contain; background: var(--surface); }
 .editor-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; border-bottom: 1px solid var(--line); }
@@ -581,7 +585,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-color-scheme: dark) {
   .editor-sheet-popup, .editor-sheet, .sheet-bar { background: var(--surface); }
   .adm-picker, .adm-picker-view { --adm-color-background: var(--surface); color: var(--ink); }
-  .event-divider { color: #d6dacd; background: rgba(35,39,35,.72); }
   .event-cancel { color: #e5e6e2; background: #454844; }
 }
 

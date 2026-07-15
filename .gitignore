@@ -20,6 +20,8 @@ pnpm-debug.log*
 # Test / coverage
 coverage/
 .vitest/
+test-results/
+playwright-report/
 
 # Editor / IDE
 .vscode/*

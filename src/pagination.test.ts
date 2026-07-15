@@ -36,6 +36,16 @@ describe("paginateItems", () => {
       .toThrowError(OversizedItemError);
   });
 
+  it("keeps stable chronological order across three pages", () => {
+    const pages = paginateItems(
+      items,
+      new Map([["time", 45], ["one", 45], ["two", 45]]),
+      50,
+    );
+    expect(pages.map((page) => page.map((item) => item.id))).toEqual([["time"], ["one"], ["two"]]);
+    expect(() => assertStablePagination(items, pages)).not.toThrow();
+  });
+
   it("rejects missing measurements", () => {
     expect(() => paginateItems(items, new Map([["time", 20]]), 100)).toThrow("无法测量消息 one");
   });

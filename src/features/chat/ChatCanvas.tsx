@@ -36,10 +36,18 @@ export function ChatCanvas({
     <article
       className={`chat-phone template-${template.id} mode-${mode} ${dark ? "is-dark" : ""}`}
       style={{
-        "--chat-background": backgroundUrl ? `url(${backgroundUrl})` : template.canvasBackground,
+        "--chat-background": template.canvasBackground,
       } as React.CSSProperties}
       aria-label={`${template.name}聊天预览`}
     >
+      {backgroundUrl ? (
+        <img
+          className="chat-background-image"
+          src={backgroundUrl}
+          alt=""
+          aria-hidden="true"
+        />
+      ) : null}
       <ChatStatusBar />
       <ChatHeader title={project.content.conversationTitle} />
       <div className="chat-stream" data-chat-stream={mode}>
@@ -47,6 +55,9 @@ export function ChatCanvas({
           <div
             className={`chat-item-wrap ${oversizedId === item.id ? "is-oversized" : ""}`}
             data-chat-item-id={item.id}
+            data-item-kind={item.kind}
+            data-point-id={item.kind === "message" ? item.pointId : undefined}
+            data-sender-id={item.kind === "message" ? item.senderId : undefined}
             data-measure-id={mode === "measure" ? item.id : undefined}
             key={item.id}
           >

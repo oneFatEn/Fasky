@@ -2,9 +2,49 @@ import type { AssetRecord, ChatProject, RecoveryRecord } from "./types";
 import { migrateChatProject } from "./features/chat/model/chatMigration";
 
 const DB_NAME = "faksy";
-const DB_VERSION = 1;
+export const FAKSY_DB_VERSION = 2;
 
 let databasePromise: Promise<IDBDatabase> | undefined;
+let databaseInstance: IDBDatabase | undefined;
+
+type StoreName = "projects" | "assets" | "recovery";
+
+function ensureIndex(
+  store: IDBObjectStore,
+  name: string,
+  keyPath: string,
+): void {
+  if (!store.indexNames.contains(name)) store.createIndex(name, keyPath);
+}
+
+/**
+ * Keep every IndexedDB schema transition explicit and additive. A newly created
+ * database runs every migration in order, while an older database only runs the
+ * transitions newer than its current version.
+ */
+export function migrateFaksyDatabase(
+  database: IDBDatabase,
+  transaction: IDBTransaction,
+  oldVersion: number,
+): void {
+  if (oldVersion < 1) {
+    database.createObjectStore("projects", { keyPath: "id" });
+    database.createObjectStore("assets", { keyPath: "id" });
+    database.createObjectStore("recovery", { keyPath: "id" });
+  }
+
+  if (oldVersion < 2) {
+    const stores = new Set<StoreName>(["projects", "assets", "recovery"]);
+    for (const storeName of stores) {
+      if (!database.objectStoreNames.contains(storeName)) {
+        database.createObjectStore(storeName, { keyPath: "id" });
+      }
+    }
+    ensureIndex(transaction.objectStore("projects"), "updatedAt", "updatedAt");
+    ensureIndex(transaction.objectStore("projects"), "type", "type");
+    ensureIndex(transaction.objectStore("assets"), "projectId", "projectId");
+  }
+}
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -25,25 +65,25 @@ export function openFaksyDB(): Promise<IDBDatabase> {
   if (databasePromise) return databasePromise;
 
   databasePromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(DB_NAME, FAKSY_DB_VERSION);
 
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains("projects")) {
-        const projects = database.createObjectStore("projects", { keyPath: "id" });
-        projects.createIndex("updatedAt", "updatedAt");
-        projects.createIndex("type", "type");
-      }
-      if (!database.objectStoreNames.contains("assets")) {
-        const assets = database.createObjectStore("assets", { keyPath: "id" });
-        assets.createIndex("projectId", "projectId");
-      }
-      if (!database.objectStoreNames.contains("recovery")) {
-        database.createObjectStore("recovery", { keyPath: "id" });
-      }
+    request.onupgradeneeded = (event) => {
+      migrateFaksyDatabase(
+        request.result,
+        request.transaction!,
+        (event as IDBVersionChangeEvent).oldVersion,
+      );
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      databaseInstance = request.result;
+      databaseInstance.onversionchange = () => {
+        databaseInstance?.close();
+        databaseInstance = undefined;
+        databasePromise = undefined;
+      };
+      resolve(request.result);
+    };
     request.onerror = () => {
       databasePromise = undefined;
       reject(request.error ?? new Error("无法打开浏览器草稿库"));
@@ -71,7 +111,7 @@ export async function saveProject(project: ChatProject): Promise<void> {
 
 export async function deleteProject(projectId: string): Promise<void> {
   const database = await openFaksyDB();
-  const transaction = database.transaction(["projects", "assets"], "readwrite");
+  const transaction = database.transaction(["projects", "assets", "recovery"], "readwrite");
   transaction.objectStore("projects").delete(projectId);
   const assets = transaction.objectStore("assets");
   const index = assets.index("projectId");
@@ -81,6 +121,11 @@ export async function deleteProject(projectId: string): Promise<void> {
     if (!cursor) return;
     cursor.delete();
     cursor.continue();
+  };
+  const recovery = transaction.objectStore("recovery");
+  const recoveryRequest = recovery.get("current") as IDBRequest<RecoveryRecord | undefined>;
+  recoveryRequest.onsuccess = () => {
+    if (recoveryRequest.result?.project.id === projectId) recovery.delete("current");
   };
   await transactionDone(transaction);
 }
@@ -139,5 +184,7 @@ export async function clearRecovery(): Promise<void> {
 }
 
 export function resetDatabaseForTests(): void {
+  databaseInstance?.close();
+  databaseInstance = undefined;
   databasePromise = undefined;
 }

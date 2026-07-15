@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toBlob } from "html-to-image";
 import { assertStablePagination, OversizedItemError, paginateItems } from "../../../pagination";
 import type { ChatItem, ChatProject, ExportResult } from "../../../types";
-import { hasUnresolvedTimeSegments } from "../../chat/model/chatMigration";
+import { describeOversizedMessage, validateExportProject } from "../exportValidation";
 
 const waitForPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
@@ -62,12 +62,7 @@ export function useChatExport({ project, assetUrls }: UseChatExportOptions) {
     setResults([]);
     setOversizedId(undefined);
     try {
-      if (project.content.items.length === 0) throw new Error("至少添加一条内容后再导出");
-      if (hasUnresolvedTimeSegments(project)) throw new Error("请先确认所有旧时间段的日期时间再导出");
-      const pointIds = new Set(project.content.items.filter((item) => item.kind !== "message").map((item) => item.id));
-      if (project.content.items.some((item) => item.kind === "message" && !pointIds.has(item.pointId))) {
-        throw new Error("存在未关联时间或事件点的消息，请重新编辑后再导出");
-      }
+      validateExportProject(project);
       await document.fonts?.ready;
       await waitForAssetImages(assetUrls);
       await waitForPaint();
@@ -89,7 +84,9 @@ export function useChatExport({ project, assetUrls }: UseChatExportOptions) {
           width: project.export.width,
           height: project.export.height,
           pixelRatio: project.export.pixelRatio,
-          cacheBust: true,
+          // Uploaded assets are local Blob URLs. Cache-busting would append a
+          // query string and can make those URLs unreadable during cloning.
+          cacheBust: false,
           backgroundColor: project.theme.appearance === "dark" ? "#161918" : "#ededed",
         });
         if (!blob) throw new Error("浏览器未能生成图片");
@@ -109,8 +106,12 @@ export function useChatExport({ project, assetUrls }: UseChatExportOptions) {
       setResults(output);
     } catch (error) {
       output.forEach((result) => URL.revokeObjectURL(result.url));
-      if (error instanceof OversizedItemError) setOversizedId(error.itemId);
-      setError(error instanceof Error ? error.message : "导出失败，请重试");
+      if (error instanceof OversizedItemError) {
+        setOversizedId(error.itemId);
+        setError(describeOversizedMessage(project, error.itemId));
+      } else {
+        setError(error instanceof Error ? error.message : "导出失败，请重试");
+      }
     } finally {
       setExporting(false);
     }
