@@ -24,7 +24,7 @@ export interface MessageItem {
   id: string;
   kind: "message";
   senderId: string;
-  timeSegmentId: string;
+  pointId: string;
   messageType: "text" | "image" | "sticker";
   content: string;
 }
@@ -37,7 +37,14 @@ export interface TimeDividerItem {
   requiresConfirmation?: true;
 }
 
-export type ChatItem = MessageItem | TimeDividerItem;
+export interface EventDividerItem {
+  id: string;
+  kind: "event-divider";
+  content: string;
+}
+
+export type DialoguePointItem = TimeDividerItem | EventDividerItem;
+export type ChatItem = MessageItem | DialoguePointItem;
 
 export interface ChatDocument {
   templateId: TemplateId;

@@ -4,8 +4,8 @@ import type { ChatItem } from "./types";
 
 const items: ChatItem[] = [
   { id: "time", kind: "time-divider", timestamp: "2026-07-14T16:28" },
-  { id: "one", kind: "message", senderId: "a", timeSegmentId: "time", messageType: "text", content: "一" },
-  { id: "two", kind: "message", senderId: "b", timeSegmentId: "time", messageType: "text", content: "二" },
+  { id: "one", kind: "message", senderId: "a", pointId: "time", messageType: "text", content: "一" },
+  { id: "two", kind: "message", senderId: "b", pointId: "time", messageType: "text", content: "二" },
 ];
 
 describe("paginateItems", () => {
@@ -19,6 +19,16 @@ describe("paginateItems", () => {
     const pages = paginateItems(items, new Map([["time", 20], ["one", 50], ["two", 40]]), 100);
     expect(pages.map((page) => page.map((item) => item.id))).toEqual([["time", "one"], ["two"]]);
     expect(() => assertStablePagination(items, pages)).not.toThrow();
+  });
+
+  it("includes the visual gap between message blocks", () => {
+    const pages = paginateItems(
+      items,
+      new Map([["time", 20], ["one", 30], ["two", 30]]),
+      100,
+      12,
+    );
+    expect(pages.map((page) => page.map((item) => item.id))).toEqual([["time", "one"], ["two"]]);
   });
 
   it("blocks an item taller than a page", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject } from "../../../defaultProject";
-import { appendMessageToTimeSegment, applyTemplate, insertChatItem, moveMessageWithinTimeSegment, updateChatProject } from "./chatActions";
+import { addEventPoint, appendMessageToPoint, applyTemplate, insertChatItem, moveMessageWithinPoint, updateChatProject } from "./chatActions";
 import { CHAT_TEMPLATES } from "../../../templates";
 
 describe("chat actions", () => {
@@ -42,10 +42,10 @@ describe("chat actions", () => {
       timestamp: "2026-07-15T09:00",
     });
     const senderId = project.content.currentParticipantId;
-    const message = appendMessageToTimeSegment(project, firstSegment.id, senderId);
+    const message = appendMessageToPoint(project, firstSegment.id, senderId);
     const secondSegmentIndex = project.content.items.findIndex((item) => item.id === secondSegmentId);
     expect(project.content.items[secondSegmentIndex - 1]?.id).toBe(message.id);
-    expect(message).toMatchObject({ senderId, timeSegmentId: firstSegment.id, content: "" });
+    expect(message).toMatchObject({ senderId, pointId: firstSegment.id, content: "" });
   });
 
   it("uses the requested participant for left and right segment insertion", () => {
@@ -55,12 +55,21 @@ describe("chat actions", () => {
     const other = project.content.participants.find((person) => person.id !== current)?.id;
     expect(segment && other).toBeTruthy();
     if (!segment || !other) return;
-    const left = appendMessageToTimeSegment(project, segment.id, other);
-    const right = appendMessageToTimeSegment(project, segment.id, current);
+    const left = appendMessageToPoint(project, segment.id, other);
+    const right = appendMessageToPoint(project, segment.id, current);
     expect(left.senderId).toBe(other);
     expect(right.senderId).toBe(current);
-    expect(left.timeSegmentId).toBe(segment.id);
-    expect(right.timeSegmentId).toBe(segment.id);
+    expect(left.pointId).toBe(segment.id);
+    expect(right.pointId).toBe(segment.id);
+  });
+
+  it("associates messages with an event point", () => {
+    const project = createProject("wechat");
+    const point = addEventPoint(project, "灯光突然熄灭");
+    const message = appendMessageToPoint(project, point.id, project.content.currentParticipantId);
+    expect(point).toMatchObject({ kind: "event-divider", content: "灯光突然熄灭" });
+    expect(message.pointId).toBe(point.id);
+    expect(project.content.items.at(-1)?.id).toBe(message.id);
   });
 
   it("moves a message only within its own time segment", () => {
@@ -71,11 +80,11 @@ describe("chat actions", () => {
     expect(first && second).toBeTruthy();
     if (!first || first.kind !== "message" || !second || second.kind !== "message") return;
 
-    expect(moveMessageWithinTimeSegment(project, second.id, "up")).toBe(true);
-    const reordered = project.content.items.filter((item) => item.kind === "message" && item.timeSegmentId === first.timeSegmentId);
+    expect(moveMessageWithinPoint(project, second.id, "up")).toBe(true);
+    const reordered = project.content.items.filter((item) => item.kind === "message" && item.pointId === first.pointId);
     expect(reordered.slice(0, 2).map((item) => item.id)).toEqual([second.id, first.id]);
-    expect(moveMessageWithinTimeSegment(project, second.id, "up")).toBe(false);
+    expect(moveMessageWithinPoint(project, second.id, "up")).toBe(false);
     const last = reordered.at(-1);
-    expect(last && moveMessageWithinTimeSegment(project, last.id, "down")).toBe(false);
+    expect(last && moveMessageWithinPoint(project, last.id, "down")).toBe(false);
   });
 });

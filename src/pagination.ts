@@ -14,8 +14,10 @@ export function paginateItems(
   items: ChatItem[],
   heights: ReadonlyMap<string, number>,
   capacity: number,
+  itemGap = 0,
 ): ChatItem[][] {
   if (capacity <= 0) throw new Error("分页可用高度必须大于零");
+  if (!Number.isFinite(itemGap) || itemGap < 0) throw new Error("消息间距不能小于零");
   if (items.length === 0) return [];
 
   const pages: ChatItem[][] = [];
@@ -29,12 +31,14 @@ export function paginateItems(
     }
     if (height > capacity) throw new OversizedItemError(item.id);
 
-    if (currentPage.length > 0 && usedHeight + height > capacity) {
+    const nextGap = currentPage.length > 0 ? itemGap : 0;
+    if (currentPage.length > 0 && usedHeight + nextGap + height > capacity) {
       pages.push(currentPage);
       currentPage = [];
       usedHeight = 0;
     }
 
+    if (currentPage.length > 0) usedHeight += itemGap;
     currentPage.push(item);
     usedHeight += height;
   }

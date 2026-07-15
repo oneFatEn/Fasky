@@ -7,6 +7,7 @@ import {
   Check,
   Clock,
   DownloadSimple,
+  Flag,
   ImageSquare,
   SlidersHorizontal,
   UserCircle,
@@ -15,16 +16,18 @@ import { CanvasEditor } from "../features/chat/components/CanvasEditor";
 import { ChatStyleEditor } from "../features/chat/components/ChatStyleEditor";
 import { MessageEditor } from "../features/chat/components/MessageEditor";
 import { ParticipantEditor } from "../features/chat/components/ParticipantEditor";
+import { EventPointDialog } from "../features/chat/components/EventPointDialog";
 import { ChatCanvas } from "../features/chat/ChatCanvas";
 import { useAssetUrls } from "../features/chat/useAssetUrls";
 import { useProjectAssets } from "../features/chat/hooks/useProjectAssets";
 import {
   addTimeSegment,
-  appendMessageToTimeSegment,
+  addEventPoint,
+  appendMessageToPoint,
   applyTemplate,
   findMessage,
   findParticipant,
-  moveMessageWithinTimeSegment,
+  moveMessageWithinPoint,
   updateChatProject,
 } from "../features/chat/model/chatActions";
 import {
@@ -36,6 +39,7 @@ import {
   parseLocalDateTime,
 } from "../features/chat/model/localDateTime";
 import { ExportRenderTree, MeasureRenderTree } from "../features/export/ExportRenderTree";
+import { ExportDialog } from "../features/export/ExportDialog";
 import { useChatExport } from "../features/export/hooks/useChatExport";
 import { EditorSheet } from "../shared/EditorSheet";
 import type { ChatProject, EditorTab, TemplateId } from "../types";
@@ -53,6 +57,8 @@ type PickerState =
   | { kind: "edit-time"; value: Date; segmentId: string }
   | { kind: "reference-date"; value: Date };
 
+type EventDialogState = { mode: "new"; value: string } | { mode: "edit"; value: string; pointId: string };
+
 const sheetTitles: Record<EditorTab, string> = {
   content: "编辑内容",
   people: "编辑人物",
@@ -66,9 +72,11 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   const [picker, setPicker] = useState<PickerState>({ kind: "new-time", value: new Date() });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [eventDialog, setEventDialog] = useState<EventDialogState>();
+  const [exportOpen, setExportOpen] = useState(false);
   const assetUrls = useAssetUrls(project);
   const saveImage = useProjectAssets(project.id, setNotice);
-  const { pages, results, exporting, oversizedId, exportImages } = useChatExport({ project, assetUrls, onNotice: setNotice });
+  const { pages, results, exporting, oversizedId, error: exportError, exportImages } = useChatExport({ project, assetUrls });
   const participants = project.content.participants;
   const pageEstimate = useMemo(() => Math.max(1, Math.ceil(project.content.items.length / 8)), [project.content.items.length]);
   const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
@@ -83,15 +91,15 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   const deleteItem = (id: string) => {
     change((draft) => {
       const target = draft.content.items.find((item) => item.id === id);
-      const deletedSegment = target?.kind === "time-divider";
-      draft.content.items = deletedSegment
-        ? draft.content.items.filter((item) => item.id !== id && (item.kind !== "message" || item.timeSegmentId !== id))
+      const deletedPoint = target?.kind !== "message";
+      draft.content.items = deletedPoint
+        ? draft.content.items.filter((item) => item.id !== id && (item.kind !== "message" || item.pointId !== id))
         : draft.content.items.filter((item) => item.id !== id);
     });
   };
 
-  const addMessage = (timeSegmentId: string, senderId: string) => {
-    change((draft) => { appendMessageToTimeSegment(draft, timeSegmentId, senderId); });
+  const addMessage = (pointId: string, senderId: string) => {
+    change((draft) => { appendMessageToPoint(draft, pointId, senderId); });
   };
 
   const openTimeEditor = (segmentId: string) => {
@@ -143,7 +151,29 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   };
 
   const moveMessage = (id: string, direction: "up" | "down") => {
-    change((draft) => { moveMessageWithinTimeSegment(draft, id, direction); });
+    change((draft) => { moveMessageWithinPoint(draft, id, direction); });
+  };
+
+  const openEventEditor = (pointId: string) => {
+    const point = project.content.items.find((item) => item.kind === "event-divider" && item.id === pointId);
+    if (point?.kind === "event-divider") setEventDialog({ mode: "edit", pointId, value: point.content });
+  };
+
+  const confirmEvent = () => {
+    if (!eventDialog?.value.trim()) return;
+    change((draft) => {
+      if (eventDialog.mode === "new") addEventPoint(draft, eventDialog.value);
+      else {
+        const point = draft.content.items.find((item) => item.kind === "event-divider" && item.id === eventDialog.pointId);
+        if (point?.kind === "event-divider") point.content = eventDialog.value.trim();
+      }
+    });
+    setEventDialog(undefined);
+  };
+
+  const beginExport = () => {
+    setExportOpen(true);
+    void exportImages();
   };
 
   return (
@@ -164,7 +194,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
           tab={sheetOpen ? tab : undefined}
           onChange={(nextTab) => { setTab(nextTab); setSheetOpen(true); }}
           exporting={exporting}
-          onExport={() => void exportImages()}
+          onExport={beginExport}
         />
       </footer>
 
@@ -177,6 +207,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
                 <CalendarBlank size={16} weight="bold" /><span>今天</span><strong>{project.content.referenceDate.slice(5)}</strong>
               </button>
               <button onClick={() => openPicker({ kind: "new-time", value: new Date(Math.min(Date.now(), latestAllowedTime.getTime())) })} type="button"><Clock size={16} />时间</button>
+              <button onClick={() => setEventDialog({ mode: "new", value: "" })} type="button"><Flag size={16} />事件</button>
             </>
           ) : undefined}
         >
@@ -188,6 +219,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               assetUrls={assetUrls}
               onAddMessage={addMessage}
               onEditTime={openTimeEditor}
+              onEditEvent={openEventEditor}
               onChangeMessage={(id, patch) => change((draft) => { const item = findMessage(draft, id); if (item) Object.assign(item, patch); })}
               onDelete={deleteItem}
               onMoveMessage={moveMessage}
@@ -240,7 +272,22 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
         />
       ) : null}
 
-      {results.length > 0 ? <section className="export-results"><div><span>导出完成</span><strong>{results.length} 张图片，逻辑高度均为 {project.export.height}px</strong></div><div>{results.map((result, index) => <a href={result.url} download={result.fileName} key={result.url}>下载第 {index + 1} 张</a>)}</div></section> : null}
+      <EventPointDialog
+        open={Boolean(eventDialog)}
+        mode={eventDialog?.mode ?? "new"}
+        value={eventDialog?.value ?? ""}
+        onChange={(value) => setEventDialog((current) => current ? { ...current, value } : current)}
+        onConfirm={confirmEvent}
+        onCancel={() => setEventDialog(undefined)}
+      />
+      <ExportDialog
+        open={exportOpen}
+        exporting={exporting}
+        error={exportError}
+        results={results}
+        onClose={() => { if (!exporting) setExportOpen(false); }}
+        onRetry={() => void exportImages()}
+      />
       <MeasureRenderTree project={project} assetUrls={assetUrls} />
       <ExportRenderTree project={project} pages={pages} assetUrls={assetUrls} />
     </main>

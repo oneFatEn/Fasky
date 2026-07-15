@@ -10,9 +10,10 @@ interface MessageEditorProps {
   participants: Participant[];
   currentParticipantId: string;
   assetUrls: Record<string, string>;
-  onAddMessage: (timeSegmentId: string, senderId: string) => void;
+  onAddMessage: (pointId: string, senderId: string) => void;
   onChangeMessage: (id: string, patch: { senderId?: string; content?: string }) => void;
   onEditTime: (id: string) => void;
+  onEditEvent: (id: string) => void;
   onDelete: (id: string) => void;
   onMoveMessage: (id: string, direction: "up" | "down") => void;
 }
@@ -133,6 +134,7 @@ export function MessageEditor({
   onAddMessage,
   onChangeMessage,
   onEditTime,
+  onEditEvent,
   onDelete,
   onMoveMessage,
 }: MessageEditorProps) {
@@ -147,37 +149,37 @@ export function MessageEditor({
   return (
     <div className="content-editor">
       <div className="message-editor-list">
-        {items.map((item) => item.kind === "time-divider" ? (
+        {items.map((item) => item.kind !== "message" ? (
           <SwipeAction
             className="editor-swipe-action time-segment-swipe"
             rightActions={[{
               key: "delete",
               color: "var(--surface)",
-              text: <SwipeIcon label="删除时间段" tone="danger"><Trash size={18} weight="bold" /></SwipeIcon>,
+              text: <SwipeIcon label={`删除${item.kind === "time-divider" ? "时间点" : "事件点"}`} tone="danger"><Trash size={18} weight="bold" /></SwipeIcon>,
               onClick: () => onDelete(item.id),
             }]}
             key={item.id}
           >
-          <div className={`time-segment-editor ${item.requiresConfirmation ? "requires-confirmation" : ""}`}>
+          <div className={`time-segment-editor ${item.kind === "time-divider" && item.requiresConfirmation ? "requires-confirmation" : ""}`}>
             <button
               className="segment-add segment-add-other"
               disabled={!other}
               onClick={() => other && onAddMessage(item.id, other.id)}
-              aria-label={`在此时间段末尾新增${other?.displayName ?? "对话人物"}的气泡`}
+              aria-label={`在此点末尾新增${other?.displayName ?? "对话人物"}的气泡`}
               type="button"
             >
               <Plus size={16} weight="bold" />
               <span>对方</span>
             </button>
-            <button className="segment-time" onClick={() => onEditTime(item.id)} type="button">
-              <span>{formatEditorTimestamp(item.timestamp)}</span>
-              {item.requiresConfirmation ? <small>原值：{item.legacyLabel}</small> : <small>点击修改日期时间</small>}
+            <button className={`segment-time ${item.kind === "event-divider" ? "is-event" : ""}`} onClick={() => item.kind === "time-divider" ? onEditTime(item.id) : onEditEvent(item.id)} type="button">
+              <span>{item.kind === "time-divider" ? formatEditorTimestamp(item.timestamp) : item.content}</span>
+              {item.kind === "time-divider" && item.requiresConfirmation ? <small>原值：{item.legacyLabel}</small> : <small>{item.kind === "time-divider" ? "点击修改日期时间" : "事件点，点击修改"}</small>}
             </button>
             <button
               className="segment-add segment-add-current"
               disabled={!current}
               onClick={() => current && onAddMessage(item.id, current.id)}
-              aria-label={`在此时间段末尾新增${current?.displayName ?? "我方人物"}的气泡`}
+              aria-label={`在此点末尾新增${current?.displayName ?? "我方人物"}的气泡`}
               type="button"
             >
               <Plus size={16} weight="bold" />
@@ -187,8 +189,8 @@ export function MessageEditor({
           </SwipeAction>
         ) : (
           (() => {
-            const segmentMessages = items.filter((entry): entry is MessageItem => entry.kind === "message" && entry.timeSegmentId === item.timeSegmentId);
-            const position = segmentMessages.findIndex((entry) => entry.id === item.id);
+            const pointMessages = items.filter((entry): entry is MessageItem => entry.kind === "message" && entry.pointId === item.pointId);
+            const position = pointMessages.findIndex((entry) => entry.id === item.id);
             return <MessageEditorRow
               item={item}
               participants={participants}
@@ -196,13 +198,13 @@ export function MessageEditor({
               onChange={(patch) => onChangeMessage(item.id, patch)}
               onDelete={() => onDelete(item.id)}
               onMoveUp={position > 0 ? () => moveMessageAndResetSwipe(item.id, "up") : undefined}
-              onMoveDown={position >= 0 && position < segmentMessages.length - 1 ? () => moveMessageAndResetSwipe(item.id, "down") : undefined}
+              onMoveDown={position >= 0 && position < pointMessages.length - 1 ? () => moveMessageAndResetSwipe(item.id, "down") : undefined}
               key={`${item.id}-${swipeRevision}`}
             />;
           })()
         ))}
         {items.length === 0 ? (
-          <div className="content-empty"><ChatCircle size={28} /><strong>还没有时间段</strong><span>先从顶部新增时间，再按左右人物添加气泡。</span></div>
+          <div className="content-empty"><ChatCircle size={28} /><strong>还没有时间或事件点</strong><span>先从顶部新增一个点，再按左右人物添加气泡。</span></div>
         ) : null}
       </div>
     </div>

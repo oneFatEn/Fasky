@@ -1,11 +1,11 @@
-import type { ChatItem, ChatProject, MessageItem, TimeDividerItem } from "../../../types";
+import type { ChatItem, ChatProject, EventDividerItem, MessageItem, TimeDividerItem } from "../../../types";
 import { formatLocalDate, parseLocalDate, parseLocalDateTime } from "./localDateTime";
 
-export const CHAT_SCHEMA_VERSION = 4;
+export const CHAT_SCHEMA_VERSION = 5;
 
 type LegacyTimeDivider = Omit<TimeDividerItem, "timestamp"> & { label?: string; timestamp?: string | null };
-type LegacyMessage = Omit<MessageItem, "timeSegmentId"> & { timeSegmentId?: string; timestamp?: string };
-type LegacyItem = LegacyTimeDivider | LegacyMessage;
+type LegacyMessage = Omit<MessageItem, "pointId"> & { pointId?: string; timeSegmentId?: string; timestamp?: string };
+type LegacyItem = LegacyTimeDivider | EventDividerItem | LegacyMessage;
 type LegacyProject = Omit<ChatProject, "content"> & {
   content: Omit<ChatProject["content"], "referenceDate" | "items"> & {
     referenceTimestamp?: string;
@@ -45,7 +45,7 @@ export function migrateChatProject(project: ChatProject | LegacyProject): ChatPr
       : fallbackReferenceDate;
 
   const migratedItems: ChatItem[] = [];
-  let currentSegmentId: string | undefined;
+  let currentPointId: string | undefined;
   for (const item of draft.content.items) {
     if (item.kind === "time-divider") {
       const timestamp = parseLocalDateTime(item.timestamp ?? null)
@@ -61,19 +61,25 @@ export function migrateChatProject(project: ChatProject | LegacyProject): ChatPr
         }),
       };
       migratedItems.push(divider);
-      currentSegmentId = divider.id;
+      currentPointId = divider.id;
       continue;
     }
 
-    if (!currentSegmentId) {
+    if (item.kind === "event-divider") {
+      migratedItems.push(item as ChatItem);
+      currentPointId = item.id;
+      continue;
+    }
+
+    if (!currentPointId) {
       const divider = makeUnresolvedDivider();
       migratedItems.push(divider);
-      currentSegmentId = divider.id;
+      currentPointId = divider.id;
     }
-    const { timestamp: _discardedMessageTimestamp, ...message } = item;
+    const { timestamp: _discardedMessageTimestamp, timeSegmentId: _legacyPointId, ...message } = item;
     migratedItems.push({
       ...message,
-      timeSegmentId: item.timeSegmentId ?? currentSegmentId,
+      pointId: item.pointId ?? item.timeSegmentId ?? currentPointId,
     });
   }
 

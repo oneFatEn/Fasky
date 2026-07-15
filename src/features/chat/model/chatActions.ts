@@ -1,4 +1,4 @@
-import type { ChatItem, ChatProject, MessageItem, Participant, TemplateId, TimeDividerItem } from "../../../types";
+import type { ChatItem, ChatProject, EventDividerItem, MessageItem, Participant, TemplateId, TimeDividerItem } from "../../../types";
 import { CHAT_TEMPLATES } from "../../../templates";
 
 export function updateChatProject(
@@ -25,34 +25,45 @@ export function insertChatItem(project: ChatProject, item: ChatItem, index: numb
   project.content.items.splice(safeIndex, 0, item);
 }
 
-export function appendMessageToTimeSegment(
+export function appendMessageToPoint(
   project: ChatProject,
-  timeSegmentId: string,
+  pointId: string,
   senderId: string,
 ): MessageItem {
   if (!project.content.participants.some((participant) => participant.id === senderId)) {
     throw new Error("消息发送者不存在");
   }
-  const segmentIndex = project.content.items.findIndex(
-    (item) => item.kind === "time-divider" && item.id === timeSegmentId,
+  const pointIndex = project.content.items.findIndex(
+    (item) => item.kind !== "message" && item.id === pointId,
   );
-  if (segmentIndex < 0) throw new Error("时间段不存在");
-  const nextSegmentOffset = project.content.items.slice(segmentIndex + 1).findIndex(
-    (item) => item.kind === "time-divider",
+  if (pointIndex < 0) throw new Error("时间或事件点不存在");
+  const nextPointOffset = project.content.items.slice(pointIndex + 1).findIndex(
+    (item) => item.kind !== "message",
   );
-  const insertIndex = nextSegmentOffset < 0
+  const insertIndex = nextPointOffset < 0
     ? project.content.items.length
-    : segmentIndex + 1 + nextSegmentOffset;
+    : pointIndex + 1 + nextPointOffset;
   const message: MessageItem = {
     id: crypto.randomUUID(),
     kind: "message",
     senderId,
-    timeSegmentId,
+    pointId,
     messageType: "text",
     content: "",
   };
   project.content.items.splice(insertIndex, 0, message);
   return message;
+}
+
+export function addEventPoint(project: ChatProject, content: string): EventDividerItem {
+  const item: EventDividerItem = {
+    id: crypto.randomUUID(),
+    kind: "event-divider",
+    content: content.trim(),
+  };
+  if (!item.content) throw new Error("请输入事件内容");
+  project.content.items.push(item);
+  return item;
 }
 
 export function addTimeSegment(project: ChatProject, timestamp: string): TimeDividerItem {
@@ -65,7 +76,7 @@ export function addTimeSegment(project: ChatProject, timestamp: string): TimeDiv
   return item;
 }
 
-export function moveMessageWithinTimeSegment(
+export function moveMessageWithinPoint(
   project: ChatProject,
   messageId: string,
   direction: "up" | "down",
@@ -74,7 +85,7 @@ export function moveMessageWithinTimeSegment(
   if (!message) return false;
 
   const messageIndexes = project.content.items.flatMap((item, index) => (
-    item.kind === "message" && item.timeSegmentId === message.timeSegmentId ? [index] : []
+    item.kind === "message" && item.pointId === message.pointId ? [index] : []
   ));
   const position = messageIndexes.findIndex((index) => project.content.items[index]?.id === messageId);
   const targetPosition = direction === "up" ? position - 1 : position + 1;

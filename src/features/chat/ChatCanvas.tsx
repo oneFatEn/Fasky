@@ -42,10 +42,11 @@ export function ChatCanvas({
     >
       <ChatStatusBar />
       <ChatHeader title={project.content.conversationTitle} />
-      <div className="chat-stream">
+      <div className="chat-stream" data-chat-stream={mode}>
         {items.map((item) => (
           <div
             className={`chat-item-wrap ${oversizedId === item.id ? "is-oversized" : ""}`}
+            data-chat-item-id={item.id}
             data-measure-id={mode === "measure" ? item.id : undefined}
             key={item.id}
           >

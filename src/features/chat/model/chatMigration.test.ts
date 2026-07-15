@@ -10,13 +10,17 @@ describe("chat schema migration", () => {
     legacy.content.referenceDate = "2026-07-14";
     legacy.schemaVersion = 1;
     legacy.content.items[0] = { id: "segment-a", kind: "time-divider", label: "2026-07-14-16-28" };
-    legacy.content.items.slice(1).forEach((item: any) => { delete item.timeSegmentId; delete item.timestamp; });
+    legacy.content.items.slice(1).forEach((item: any) => {
+      item.timeSegmentId = "segment-a";
+      delete item.pointId;
+      delete item.timestamp;
+    });
     const migrated = migrateChatProject(legacy);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.content.referenceDate).toBe("2026-07-14");
     expect(migrated.content.items[0]).toMatchObject({ timestamp: "2026-07-14T16:28" });
     expect(migrated.content.items.slice(1).every((item) => item.kind !== "message" || (
-      item.timeSegmentId === "segment-a" && !("timestamp" in item)
+      item.pointId === "segment-a" && !("timestamp" in item)
     ))).toBe(true);
   });
 
@@ -26,7 +30,7 @@ describe("chat schema migration", () => {
     delete project.content.referenceDate;
     project.content.referenceTimestamp = "2026-07-14T22:05";
     const migrated = migrateChatProject(project);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.content.referenceDate).toBe("2026-07-14");
     expect("referenceTimestamp" in migrated.content).toBe(false);
   });

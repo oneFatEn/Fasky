@@ -43,4 +43,3 @@ export const CHAT_TEMPLATES: Record<TemplateId, ChatTemplateTokens> = {
 export const EXPORT_WIDTH = 390;
 export const EXPORT_HEIGHT = 844;
 export const EXPORT_PIXEL_RATIO = 2;
-export const EXPORT_MESSAGE_CAPACITY = 678;

@@ -20,10 +20,10 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
   const participant = project.content.participants.find((person) => person.id === item.senderId);
   if (!participant) return null;
   const own = participant.id === project.content.currentParticipantId;
-  const segment = project.content.items.find(
-    (entry) => entry.kind === "time-divider" && entry.id === item.timeSegmentId,
+  const point = project.content.items.find(
+    (entry) => entry.kind !== "message" && entry.id === item.pointId,
   );
-  const time = segment?.kind === "time-divider" ? formatTimeOfDay(segment.timestamp) : undefined;
+  const time = point?.kind === "time-divider" ? formatTimeOfDay(point.timestamp) : undefined;
 
   return (
     <div className={`chat-message ${own ? "is-own" : "is-other"}`}>
@@ -47,5 +47,6 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
 
 export function ChatItemBlock({ item, project, assetUrls }: { item: ChatItem; project: ChatProject; assetUrls: Record<string, string> }) {
   if (item.kind === "time-divider") return <div className="time-divider">{formatTimeSegment(item.timestamp, project.content.referenceDate)}</div>;
+  if (item.kind === "event-divider") return <div className="event-divider">{item.content}</div>;
   return <MessageBlock item={item} project={project} assetUrls={assetUrls} />;
 }

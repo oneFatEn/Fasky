@@ -10,7 +10,7 @@ export function createProject(templateId: TemplateId): ChatProject {
   const template = CHAT_TEMPLATES[templateId];
   const currentParticipantId = makeId();
   const otherParticipantId = makeId();
-  const timeSegmentId = makeId();
+  const pointId = makeId();
   const now = new Date();
   const referenceDate = formatLocalDate(now);
   const minutesAgo = (minutes: number) => formatLocalDateTime(new Date(now.getTime() - minutes * 60_000));
@@ -44,12 +44,12 @@ export function createProject(templateId: TemplateId): ChatProject {
         },
       ],
       items: [
-        { id: timeSegmentId, kind: "time-divider", timestamp },
+        { id: pointId, kind: "time-divider", timestamp },
         {
           id: makeId(),
           kind: "message",
           senderId: otherParticipantId,
-          timeSegmentId,
+          pointId,
           messageType: "text",
           content: "我找到一家离海很近的民宿，窗户推开就是风。",
         },
@@ -57,7 +57,7 @@ export function createProject(templateId: TemplateId): ChatProject {
           id: makeId(),
           kind: "message",
           senderId: currentParticipantId,
-          timeSegmentId,
+          pointId,
           messageType: "text",
           content: "订。周五下班直接走。",
         },
@@ -65,7 +65,7 @@ export function createProject(templateId: TemplateId): ChatProject {
           id: makeId(),
           kind: "message",
           senderId: otherParticipantId,
-          timeSegmentId,
+          pointId,
           messageType: "text",
           content: "我带相机。",
         },

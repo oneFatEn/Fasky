@@ -21,8 +21,13 @@ export function ExportRenderTree({ project, pages, assetUrls }: ExportRenderTree
 
 export function MeasureRenderTree({ project, assetUrls }: Omit<ExportRenderTreeProps, "pages">) {
   return (
-    <div className="measure-render-tree" aria-hidden="true">
-      <ChatCanvas project={project} assetUrls={assetUrls} mode="measure" />
-    </div>
+    <>
+      <div className="measure-render-tree" aria-hidden="true">
+        <ChatCanvas project={project} assetUrls={assetUrls} mode="measure" />
+      </div>
+      <div className="export-capacity-probe" aria-hidden="true">
+        <ChatCanvas project={project} items={[]} assetUrls={assetUrls} mode="export" />
+      </div>
+    </>
   );
 }
