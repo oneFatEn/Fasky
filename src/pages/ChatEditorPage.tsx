@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { DatePicker } from "antd-mobile";
 import {
   ArrowLeft,
-  CalendarBlank,
   ChatCircleDots,
   Check,
   Clock,
@@ -70,6 +69,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   const { pages, results, exporting, oversizedId, exportImages } = useChatExport({ project, assetUrls, onNotice: setNotice });
   const participants = project.content.participants;
   const pageEstimate = useMemo(() => Math.max(1, Math.ceil(project.content.items.length / 8)), [project.content.items.length]);
+  const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
   const currentParticipant = participants.find((person) => person.id === project.content.currentParticipantId);
 
   const change = (mutate: (draft: ChatProject) => void) => onChange((current) => updateChatProject(current, mutate));
@@ -104,12 +104,10 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
 
   const openTimeEditor = (segmentId: string) => {
     const segment = project.content.items.find((item) => item.kind === "time-divider" && item.id === segmentId);
-    const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
-    referenceDate.setHours(12, 0, 0, 0);
     openPicker({
       kind: "edit-time",
       segmentId,
-      value: segment?.kind === "time-divider" ? parseLocalDateTime(segment.timestamp) ?? referenceDate : referenceDate,
+      value: segment?.kind === "time-divider" ? parseLocalDateTime(segment.timestamp) ?? new Date() : new Date(),
     });
   };
 
@@ -117,17 +115,19 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
     if (picker.kind === "reference-date") {
       change((draft) => { draft.content.referenceDate = formatLocalDate(value); });
     } else if (picker.kind === "edit-time") {
+      const timestamp = formatLocalDateTime(value);
       change((draft) => {
         const item = draft.content.items.find((entry) => entry.kind === "time-divider" && entry.id === picker.segmentId);
         if (item?.kind === "time-divider") {
-          item.timestamp = formatLocalDateTime(value);
+          item.timestamp = timestamp;
           delete item.legacyLabel;
           delete item.requiresConfirmation;
         }
       });
     } else {
+      const timestamp = formatLocalDateTime(value);
       change((draft) => {
-        const segment = addTimeSegment(draft, formatLocalDateTime(value));
+        const segment = addTimeSegment(draft, timestamp);
         if (picker.kind === "new-time-with-message") {
           appendMessageToTimeSegment(draft, segment.id, draft.content.currentParticipantId);
         }
@@ -180,7 +180,6 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
             <>
               <button onClick={addMessageToLatestSegment} type="button"><Plus size={16} weight="bold" />气泡</button>
               <button onClick={() => openPicker({ kind: "new-time", value: new Date() })} type="button"><Clock size={16} />时间</button>
-              <button onClick={() => openPicker({ kind: "reference-date", value: parseLocalDate(project.content.referenceDate) ?? new Date() })} aria-label="设置今天" type="button"><CalendarBlank size={18} /></button>
             </>
           ) : undefined}
         >
@@ -189,6 +188,8 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               items={project.content.items}
               participants={participants}
               currentParticipantId={project.content.currentParticipantId}
+              referenceDate={project.content.referenceDate}
+              onEditReferenceDate={() => openPicker({ kind: "reference-date", value: referenceDate })}
               onAddMessage={addMessage}
               onEditTime={openTimeEditor}
               onChangeMessage={(id, patch) => change((draft) => { const item = findMessage(draft, id); if (item) Object.assign(item, patch); })}
@@ -223,7 +224,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
           visible
           value={picker.value}
           precision={picker.kind === "reference-date" ? "day" : "minute"}
-          title={picker.kind === "reference-date" ? "设置虚构对话中的今天" : "选择日期和时间"}
+          title={picker.kind === "reference-date" ? "设置今日日期" : "选择日期和时间"}
           min={new Date(2000, 0, 1)}
           max={new Date(2100, 11, 31, 23, 59)}
           closeOnMaskClick={false}

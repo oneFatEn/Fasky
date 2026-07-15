@@ -28,7 +28,7 @@ describe("local chat date formatting", () => {
     expect(formatTimeSegment("2026-12-31T23:59", "2027-01-01")).toBe("Yesterday 23:59");
   });
 
-  it("derives bubble corner time from the segment", () => {
+  it("derives bubble corner time from the time segment", () => {
     expect(formatTimeOfDay("2026-07-14T16:28")).toBe("16:28");
     expect(formatTimeOfDay(null)).toBeUndefined();
   });

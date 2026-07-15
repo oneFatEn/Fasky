@@ -11,8 +11,10 @@ export function createProject(templateId: TemplateId): ChatProject {
   const currentParticipantId = makeId();
   const otherParticipantId = makeId();
   const timeSegmentId = makeId();
-  const referenceDate = formatLocalDate(new Date());
-  const timestamp = formatLocalDateTime(new Date(`${referenceDate}T16:28`));
+  const now = new Date();
+  const referenceDate = formatLocalDate(now);
+  const minutesAgo = (minutes: number) => formatLocalDateTime(new Date(now.getTime() - minutes * 60_000));
+  const timestamp = minutesAgo(3);
 
   return {
     id: makeId(),

@@ -1,4 +1,4 @@
-import { ChatCircle, Plus, Trash } from "@phosphor-icons/react";
+import { CalendarBlank, ChatCircle, Plus, Trash } from "@phosphor-icons/react";
 import type { ChatItem, Participant } from "../../../types";
 import { formatEditorTimestamp } from "../model/localDateTime";
 
@@ -6,6 +6,8 @@ interface MessageEditorProps {
   items: ChatItem[];
   participants: Participant[];
   currentParticipantId: string;
+  referenceDate: string;
+  onEditReferenceDate: () => void;
   onAddMessage: (timeSegmentId: string, senderId: string) => void;
   onChangeMessage: (id: string, patch: { senderId?: string; content?: string }) => void;
   onEditTime: (id: string) => void;
@@ -16,6 +18,8 @@ export function MessageEditor({
   items,
   participants,
   currentParticipantId,
+  referenceDate,
+  onEditReferenceDate,
   onAddMessage,
   onChangeMessage,
   onEditTime,
@@ -27,6 +31,11 @@ export function MessageEditor({
   return (
     <div className="content-editor">
       <div className="message-editor-list">
+        <button className="reference-date-editor" onClick={onEditReferenceDate} type="button">
+          <span className="reference-date-icon" aria-hidden="true"><CalendarBlank size={18} weight="bold" /></span>
+          <span className="reference-date-copy"><small>今日日期</small><strong>{referenceDate}</strong></span>
+          <span className="reference-date-action">点击修改</span>
+        </button>
         {items.map((item, index) => item.kind === "time-divider" ? (
           <div className={`time-segment-editor ${item.requiresConfirmation ? "requires-confirmation" : ""}`} key={item.id}>
             <button

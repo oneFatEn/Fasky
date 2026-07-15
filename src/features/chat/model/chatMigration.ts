@@ -1,13 +1,14 @@
 import type { ChatItem, ChatProject, MessageItem, TimeDividerItem } from "../../../types";
-import { formatLocalDate, parseLocalDateTime } from "./localDateTime";
+import { formatLocalDate, parseLocalDate, parseLocalDateTime } from "./localDateTime";
 
-export const CHAT_SCHEMA_VERSION = 2;
+export const CHAT_SCHEMA_VERSION = 4;
 
 type LegacyTimeDivider = Omit<TimeDividerItem, "timestamp"> & { label?: string; timestamp?: string | null };
-type LegacyMessage = Omit<MessageItem, "timeSegmentId"> & { timeSegmentId?: string };
+type LegacyMessage = Omit<MessageItem, "timeSegmentId"> & { timeSegmentId?: string; timestamp?: string };
 type LegacyItem = LegacyTimeDivider | LegacyMessage;
 type LegacyProject = Omit<ChatProject, "content"> & {
   content: Omit<ChatProject["content"], "referenceDate" | "items"> & {
+    referenceTimestamp?: string;
     referenceDate?: string;
     items: LegacyItem[];
   };
@@ -33,8 +34,15 @@ function makeUnresolvedDivider(label = "旧消息时间待确认"): TimeDividerI
 
 export function migrateChatProject(project: ChatProject | LegacyProject): ChatProject {
   const draft = structuredClone(project) as LegacyProject;
-  const fallbackReferenceDate = formatLocalDate(new Date(draft.updatedAt));
-  draft.content.referenceDate = draft.content.referenceDate ?? fallbackReferenceDate;
+  const updatedAt = new Date(draft.updatedAt);
+  const fallbackReferenceDate = formatLocalDate(Number.isNaN(updatedAt.getTime()) ? new Date() : updatedAt);
+  const storedReferenceDate = parseLocalDate(draft.content.referenceDate ?? "");
+  const legacyReferenceTimestamp = parseLocalDateTime(draft.content.referenceTimestamp ?? null);
+  const referenceDate = storedReferenceDate
+    ? formatLocalDate(storedReferenceDate)
+    : legacyReferenceTimestamp
+      ? formatLocalDate(legacyReferenceTimestamp)
+      : fallbackReferenceDate;
 
   const migratedItems: ChatItem[] = [];
   let currentSegmentId: string | undefined;
@@ -62,15 +70,24 @@ export function migrateChatProject(project: ChatProject | LegacyProject): ChatPr
       migratedItems.push(divider);
       currentSegmentId = divider.id;
     }
-    migratedItems.push({ ...item, timeSegmentId: item.timeSegmentId ?? currentSegmentId });
+    const { timestamp: _discardedMessageTimestamp, ...message } = item;
+    migratedItems.push({
+      ...message,
+      timeSegmentId: item.timeSegmentId ?? currentSegmentId,
+    });
   }
+
+  const migratedContent = { ...draft.content } as Record<string, unknown>;
+  delete migratedContent.referenceDate;
+  delete migratedContent.referenceTimestamp;
+  delete migratedContent.items;
 
   return {
     ...draft,
     schemaVersion: CHAT_SCHEMA_VERSION,
     content: {
-      ...draft.content,
-      referenceDate: draft.content.referenceDate,
+      ...migratedContent,
+      referenceDate,
       items: migratedItems,
     },
   } as ChatProject;
