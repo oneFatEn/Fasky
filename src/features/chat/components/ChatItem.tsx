@@ -27,12 +27,10 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
         {project.content.showUsernames ? <span className="message-name">{participant.displayName}</span> : null}
         <div className="message-bubble" style={{ backgroundColor: participant.bubbleColor, color: participant.textColor }}>
           <span className="message-content">{item.content}</span>
-          {time ? (
+          {time && project.content.templateId === "whatsapp" ? (
             <span className="message-meta">
               <span className="message-time">{time}</span>
-              {project.content.templateId === "whatsapp" ? (
-                <Checks className="message-status" size={10} weight="bold" aria-label="已读" />
-              ) : null}
+              <Checks className="message-status" size={10} weight="bold" aria-label="已读" />
             </span>
           ) : null}
         </div>

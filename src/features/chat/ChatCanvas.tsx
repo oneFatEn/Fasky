@@ -63,7 +63,7 @@ export function ChatCanvas({
                 onClick={() => onDelete(item.id)}
                 type="button"
               >
-                <Trash size={8} weight="bold" />
+                <Trash size={16} weight="bold" />
               </button>
             ) : null}
           </div>

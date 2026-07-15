@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { DatePicker } from "antd-mobile";
 import {
   ArrowLeft,
+  CalendarBlank,
   ChatCircleDots,
   Check,
   Clock,
   DownloadSimple,
   ImageSquare,
-  Plus,
   SlidersHorizontal,
   UserCircle,
 } from "@phosphor-icons/react";
@@ -47,7 +47,6 @@ interface ChatEditorPageProps {
 
 type PickerState =
   | { kind: "new-time"; value: Date }
-  | { kind: "new-time-with-message"; value: Date }
   | { kind: "edit-time"; value: Date; segmentId: string }
   | { kind: "reference-date"; value: Date };
 
@@ -70,7 +69,6 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   const participants = project.content.participants;
   const pageEstimate = useMemo(() => Math.max(1, Math.ceil(project.content.items.length / 8)), [project.content.items.length]);
   const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
-  const currentParticipant = participants.find((person) => person.id === project.content.currentParticipantId);
 
   const change = (mutate: (draft: ChatProject) => void) => onChange((current) => updateChatProject(current, mutate));
   const openPicker = (nextPicker: PickerState) => {
@@ -90,16 +88,6 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
 
   const addMessage = (timeSegmentId: string, senderId: string) => {
     change((draft) => { appendMessageToTimeSegment(draft, timeSegmentId, senderId); });
-  };
-
-  const addMessageToLatestSegment = () => {
-    if (!currentParticipant) return;
-    const segment = [...project.content.items].reverse().find((item) => item.kind === "time-divider");
-    if (!segment) {
-      openPicker({ kind: "new-time-with-message", value: new Date() });
-      return;
-    }
-    addMessage(segment.id, currentParticipant.id);
   };
 
   const openTimeEditor = (segmentId: string) => {
@@ -127,10 +115,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
     } else {
       const timestamp = formatLocalDateTime(value);
       change((draft) => {
-        const segment = addTimeSegment(draft, timestamp);
-        if (picker.kind === "new-time-with-message") {
-          appendMessageToTimeSegment(draft, segment.id, draft.content.currentParticipantId);
-        }
+        addTimeSegment(draft, timestamp);
       });
     }
     setPickerOpen(false);
@@ -178,7 +163,9 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
         <EditorSheet open={sheetOpen} title={sheetTitles[tab]} closeLabel={`关闭${sheetTitles[tab]}`} returnFocusId={`editor-tab-${tab}`} onClose={() => setSheetOpen(false)}
           barActions={tab === "content" ? (
             <>
-              <button onClick={addMessageToLatestSegment} type="button"><Plus size={16} weight="bold" />气泡</button>
+              <button className="sheet-reference-date" onClick={() => openPicker({ kind: "reference-date", value: referenceDate })} type="button" aria-label={`设置今日日期，当前为${project.content.referenceDate}`}>
+                <CalendarBlank size={16} weight="bold" /><span>今天</span><strong>{project.content.referenceDate.slice(5)}</strong>
+              </button>
               <button onClick={() => openPicker({ kind: "new-time", value: new Date() })} type="button"><Clock size={16} />时间</button>
             </>
           ) : undefined}
@@ -188,8 +175,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               items={project.content.items}
               participants={participants}
               currentParticipantId={project.content.currentParticipantId}
-              referenceDate={project.content.referenceDate}
-              onEditReferenceDate={() => openPicker({ kind: "reference-date", value: referenceDate })}
+              assetUrls={assetUrls}
               onAddMessage={addMessage}
               onEditTime={openTimeEditor}
               onChangeMessage={(id, patch) => change((draft) => { const item = findMessage(draft, id); if (item) Object.assign(item, patch); })}
