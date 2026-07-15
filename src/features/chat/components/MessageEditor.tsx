@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ArrowsLeftRight, ChatCircle, Plus, Trash } from "@phosphor-icons/react";
+import { Avatar, Picker } from "antd-mobile";
 import type { ChatItem, MessageItem, Participant } from "../../../types";
 import { formatEditorTimestamp } from "../model/localDateTime";
 
@@ -31,11 +32,10 @@ function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete }:
   const [offset, setOffset] = useState(0);
   const imageUrl = sender?.avatarAssetId ? assetUrls[sender.avatarAssetId] : undefined;
 
-  const switchSender = () => {
-    const index = participants.findIndex((person) => person.id === item.senderId);
-    const next = participants[(index + 1 + participants.length) % participants.length];
-    if (next) onChange({ senderId: next.id });
-  };
+  const senderOptions = participants.map((person) => ({
+    label: person.displayName,
+    value: person.id,
+  }));
 
   return (
     <div className={`message-editor-swipe ${offset < 0 ? "is-revealed" : ""}`}>
@@ -73,12 +73,47 @@ function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete }:
           startX.current = null;
         }}
       >
-        <button className="message-sender-switch" onClick={switchSender} aria-label={`切换发送者，当前为${sender?.displayName ?? "未知人物"}`} type="button">
-          <span className="message-editor-avatar" aria-hidden="true">
-            {imageUrl ? <img src={imageUrl} alt="" /> : sender?.displayName.slice(0, 1)}
-          </span>
-          <span className="sender-switch-icon" aria-hidden="true"><ArrowsLeftRight size={13} weight="bold" /></span>
-        </button>
+        <Picker
+          columns={[senderOptions]}
+          value={[item.senderId]}
+          title="选择消息发送者"
+          closeOnMaskClick
+          popupClassName="sender-picker-popup"
+          style={{ "--item-height": "48px", "--item-font-size": "16px" }}
+          onConfirm={(value) => {
+            const senderId = value[0];
+            if (typeof senderId === "string") onChange({ senderId });
+          }}
+          renderLabel={(option) => {
+            const person = participants.find((participant) => participant.id === option.value);
+            const avatarUrl = person?.avatarAssetId ? assetUrls[person.avatarAssetId] : undefined;
+            return (
+              <span className={`sender-picker-option ${avatarUrl ? "has-avatar" : "without-avatar"}`}>
+                {avatarUrl ? (
+                  <Avatar
+                    src={avatarUrl}
+                    alt=""
+                    style={{ "--size": "32px", "--border-radius": "50%" }}
+                  />
+                ) : null}
+                <span className="sender-picker-name">{person?.displayName ?? option.label}</span>
+              </span>
+            );
+          }}
+        >
+          {(_, actions) => (
+            <button className="message-sender-switch" onClick={actions.open} aria-label={`选择发送者，当前为${sender?.displayName ?? "未知人物"}`} type="button">
+              <Avatar
+                className="message-editor-avatar"
+                src={imageUrl ?? ""}
+                fallback={<span className="avatar-initial">{sender?.displayName.slice(0, 1)}</span>}
+                alt=""
+                style={{ "--size": "48px", "--border-radius": "50%" }}
+              />
+              <span className="sender-switch-icon" aria-hidden="true"><ArrowsLeftRight size={13} weight="bold" /></span>
+            </button>
+          )}
+        </Picker>
         <label className="message-content-field">
           <span className="sr-only">消息内容</span>
           <textarea

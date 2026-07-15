@@ -1,13 +1,18 @@
 import { Checks } from "@phosphor-icons/react";
+import { Avatar } from "antd-mobile";
 import type { ChatItem, ChatProject, MessageItem, Participant } from "../../../types";
 import { formatTimeOfDay, formatTimeSegment } from "../model/localDateTime";
 
-function Avatar({ participant, assetUrls }: { participant: Participant; assetUrls: Record<string, string> }) {
+function ParticipantAvatar({ participant, assetUrls }: { participant: Participant; assetUrls: Record<string, string> }) {
   const imageUrl = participant.avatarAssetId ? assetUrls[participant.avatarAssetId] : undefined;
   return (
-    <span className="chat-avatar" aria-label={`${participant.displayName}的头像`}>
-      {imageUrl ? <img src={imageUrl} alt="" /> : participant.displayName.slice(0, 1)}
-    </span>
+    <Avatar
+      className="chat-avatar"
+      src={imageUrl ?? ""}
+      fallback={<span className="avatar-initial">{participant.displayName.slice(0, 1)}</span>}
+      alt={`${participant.displayName}的头像`}
+      style={{ "--size": "36px", "--border-radius": "50%" }}
+    />
   );
 }
 
@@ -22,7 +27,7 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
 
   return (
     <div className={`chat-message ${own ? "is-own" : "is-other"}`}>
-      {!own ? <Avatar participant={participant} assetUrls={assetUrls} /> : null}
+      {!own ? <ParticipantAvatar participant={participant} assetUrls={assetUrls} /> : null}
       <div className="bubble-stack">
         {project.content.showUsernames ? <span className="message-name">{participant.displayName}</span> : null}
         <div className="message-bubble" style={{ backgroundColor: participant.bubbleColor, color: participant.textColor }}>
@@ -35,7 +40,7 @@ function MessageBlock({ item, project, assetUrls }: { item: MessageItem; project
           ) : null}
         </div>
       </div>
-      {own ? <Avatar participant={participant} assetUrls={assetUrls} /> : null}
+      {own ? <ParticipantAvatar participant={participant} assetUrls={assetUrls} /> : null}
     </div>
   );
 }

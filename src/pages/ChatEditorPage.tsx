@@ -121,13 +121,14 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
     setPickerOpen(false);
   };
 
-  const uploadAvatar = async (participantId: string, file?: File) => {
+  const uploadAvatar = async (participantId: string, file: File) => {
     const assetId = await saveImage(file);
-    if (!assetId) return;
+    if (!assetId) return false;
     change((draft) => {
       const participant = findParticipant(draft, participantId);
       if (participant) participant.avatarAssetId = assetId;
     });
+    return true;
   };
 
   const uploadBackground = async (file?: File) => {
@@ -187,10 +188,15 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               conversationTitle={project.content.conversationTitle}
               showUsernames={project.content.showUsernames}
               participants={participants}
+              assetUrls={assetUrls}
               onConversationTitleChange={(value) => change((draft) => { draft.content.conversationTitle = value; })}
               onShowUsernamesChange={(value) => change((draft) => { draft.content.showUsernames = value; })}
               onParticipantChange={(id, patch) => change((draft) => { const participant = findParticipant(draft, id); if (participant) Object.assign(participant, patch); })}
-              onAvatarUpload={(id, file) => void uploadAvatar(id, file)}
+              onAvatarUpload={uploadAvatar}
+              onAvatarRemove={(id) => change((draft) => {
+                const participant = findParticipant(draft, id);
+                if (participant) delete participant.avatarAssetId;
+              })}
             />
           ) : null}
           {tab === "style" ? (
