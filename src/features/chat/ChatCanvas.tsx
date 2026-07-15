@@ -50,12 +50,10 @@ export function ChatCanvas({
             key={item.id}
           >
             <ChatItemBlock item={item} project={project} assetUrls={assetUrls} />
-            {mode === "editor" && onDelete ? (
+            {mode === "editor" && onDelete && item.kind === "message" ? (
               <button
                 className={`row-delete ${
-                  item.kind === "time-divider"
-                    ? "row-delete-divider"
-                    : item.senderId === project.content.currentParticipantId
+                  item.senderId === project.content.currentParticipantId
                       ? "row-delete-own"
                       : "row-delete-other"
                 }`}

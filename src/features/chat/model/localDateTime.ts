@@ -28,10 +28,20 @@ export function parseLocalDateTime(value: string | null): Date | undefined {
   return formatLocalDateTime(date) === value ? date : undefined;
 }
 
+export function getReferenceDateMaximum(referenceDate: string): Date | undefined {
+  const date = parseLocalDate(referenceDate);
+  return date ? new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59) : undefined;
+}
+
+export function clampToReferenceDate(value: Date, referenceDate: string): Date {
+  const maximum = getReferenceDateMaximum(referenceDate);
+  return maximum && value.getTime() > maximum.getTime() ? maximum : value;
+}
+
 export function formatEditorTimestamp(timestamp: string | null): string {
   const date = parseLocalDateTime(timestamp);
   if (!date) return "待确认日期时间";
-  return `${formatLocalDate(date)}-${pad(date.getHours())}-${pad(date.getMinutes())}`;
+  return `${formatLocalDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function formatTimeOfDay(timestamp: string | null): string | undefined {

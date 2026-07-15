@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampToReferenceDate,
   formatEditorTimestamp,
   formatLocalDateTime,
   formatTimeOfDay,
   formatTimeSegment,
+  getReferenceDateMaximum,
 } from "./localDateTime";
 
 describe("local chat date formatting", () => {
   it("persists local calendar components without UTC conversion", () => {
     const value = new Date(2026, 6, 14, 23, 45);
     expect(formatLocalDateTime(value)).toBe("2026-07-14T23:45");
-    expect(formatEditorTimestamp("2026-07-14T23:45")).toBe("2026-07-14-23-45");
+    expect(formatEditorTimestamp("2026-07-14T23:45")).toBe("2026-07-14 23:45");
   });
 
   it.each([
@@ -31,5 +33,12 @@ describe("local chat date formatting", () => {
   it("derives bubble corner time from the time segment", () => {
     expect(formatTimeOfDay("2026-07-14T16:28")).toBe("16:28");
     expect(formatTimeOfDay(null)).toBeUndefined();
+  });
+
+  it("limits time segments to the end of the selected reference date", () => {
+    const maximum = getReferenceDateMaximum("2026-07-15");
+    expect(maximum && formatLocalDateTime(maximum)).toBe("2026-07-15T23:59");
+    expect(formatLocalDateTime(clampToReferenceDate(new Date(2026, 6, 16, 8, 30), "2026-07-15"))).toBe("2026-07-15T23:59");
+    expect(formatLocalDateTime(clampToReferenceDate(new Date(2026, 6, 14, 8, 30), "2026-07-15"))).toBe("2026-07-14T08:30");
   });
 });

@@ -1,3 +1,5 @@
+import { ImageSquare } from "@phosphor-icons/react";
+import { Segmented } from "antd-mobile";
 import { CHAT_TEMPLATES } from "../../../templates";
 import type { TemplateId } from "../../../types";
 
@@ -18,14 +20,25 @@ export function ChatStyleEditor({
 }: ChatStyleEditorProps) {
   return (
     <div className="style-editor">
-      <div className="panel-heading"><div><span>聊天模板</span><small>切换会同步默认气泡色</small></div></div>
-      <div className="template-switch">
-        {(Object.keys(CHAT_TEMPLATES) as TemplateId[]).map((id) => (
-          <button className={templateId === id ? "active" : ""} onClick={() => onTemplateChange(id)} type="button" key={id}>{CHAT_TEMPLATES[id].name}</button>
-        ))}
-      </div>
-      <label className="upload-field"><span>聊天背景</span><input type="file" accept="image/*" onChange={(event) => onBackgroundUpload(event.target.files?.[0])} /><strong>{hasBackground ? "更换图片" : "上传图片"}</strong></label>
-      {hasBackground ? <button className="text-button danger" onClick={onBackgroundRemove} type="button">移除聊天背景</button> : null}
+      <section className="editor-setting-group">
+        <div className="setting-group-heading"><div><strong>聊天模板</strong><small>切换后同步模板的默认气泡颜色</small></div></div>
+        <Segmented
+          className="editor-segmented"
+          block
+          value={templateId}
+          options={(Object.keys(CHAT_TEMPLATES) as TemplateId[]).map((id) => ({ label: CHAT_TEMPLATES[id].name, value: id }))}
+          onChange={(value) => onTemplateChange(value as TemplateId)}
+        />
+      </section>
+      <section className="editor-setting-group">
+        <div className="setting-group-heading"><div><strong>聊天背景</strong><small>图片只应用于当前作品</small></div></div>
+        <label className="background-upload-control">
+          <input type="file" accept="image/*" onChange={(event) => onBackgroundUpload(event.target.files?.[0])} />
+          <ImageSquare size={20} />
+          <span>{hasBackground ? "更换背景图片" : "上传背景图片"}</span>
+        </label>
+        {hasBackground ? <button className="text-button danger" onClick={onBackgroundRemove} type="button">移除聊天背景</button> : null}
+      </section>
     </div>
   );
 }

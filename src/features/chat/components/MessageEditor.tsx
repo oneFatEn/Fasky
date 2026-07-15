@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { ArrowsLeftRight, ChatCircle, Plus, Trash } from "@phosphor-icons/react";
-import { Avatar, Picker } from "antd-mobile";
+import { ArrowDown, ArrowUp, ArrowsLeftRight, ChatCircle, Plus, Trash } from "@phosphor-icons/react";
+import { Avatar, Picker, SwipeAction } from "antd-mobile";
+import type { SwipeActionRef } from "antd-mobile";
 import type { ChatItem, MessageItem, Participant } from "../../../types";
 import { formatEditorTimestamp } from "../model/localDateTime";
 
@@ -13,6 +14,7 @@ interface MessageEditorProps {
   onChangeMessage: (id: string, patch: { senderId?: string; content?: string }) => void;
   onEditTime: (id: string) => void;
   onDelete: (id: string) => void;
+  onMoveMessage: (id: string, direction: "up" | "down") => void;
 }
 
 interface MessageEditorRowProps {
@@ -21,15 +23,17 @@ interface MessageEditorRowProps {
   assetUrls: Record<string, string>;
   onChange: (patch: { senderId?: string; content?: string }) => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
-const DELETE_REVEAL = 64;
+function SwipeIcon({ label, tone, children }: { label: string; tone: "neutral" | "danger"; children: React.ReactNode }) {
+  return <span className={`swipe-action-icon is-${tone}`}>{children}<span className="sr-only">{label}</span></span>;
+}
 
-function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete }: MessageEditorRowProps) {
+function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete, onMoveUp, onMoveDown }: MessageEditorRowProps) {
+  const swipeRef = useRef<SwipeActionRef>(null);
   const sender = participants.find((person) => person.id === item.senderId) ?? participants[0];
-  const startX = useRef<number | null>(null);
-  const startOffset = useRef(0);
-  const [offset, setOffset] = useState(0);
   const imageUrl = sender?.avatarAssetId ? assetUrls[sender.avatarAssetId] : undefined;
 
   const senderOptions = participants.map((person) => ({
@@ -37,42 +41,35 @@ function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete }:
     value: person.id,
   }));
 
+  const closeThenMove = (move: () => void) => {
+    swipeRef.current?.close();
+    window.requestAnimationFrame(move);
+  };
+
+  const actions = [
+    ...(onMoveUp ? [{
+      key: "move-up",
+      color: "var(--surface)",
+      text: <SwipeIcon label="上移消息" tone="neutral"><ArrowUp size={18} weight="bold" /></SwipeIcon>,
+      onClick: () => closeThenMove(onMoveUp),
+    }] : []),
+    ...(onMoveDown ? [{
+      key: "move-down",
+      color: "var(--surface)",
+      text: <SwipeIcon label="下移消息" tone="neutral"><ArrowDown size={18} weight="bold" /></SwipeIcon>,
+      onClick: () => closeThenMove(onMoveDown),
+    }] : []),
+    {
+      key: "delete",
+      color: "var(--surface)",
+      text: <SwipeIcon label="删除消息" tone="danger"><Trash size={18} weight="bold" /></SwipeIcon>,
+      onClick: onDelete,
+    },
+  ];
+
   return (
-    <div className={`message-editor-swipe ${offset < 0 ? "is-revealed" : ""}`}>
-      <button
-        className="message-swipe-delete"
-        onClick={onDelete}
-        onFocus={() => setOffset(-DELETE_REVEAL)}
-        aria-label="删除消息"
-        type="button"
-      >
-        <span className="message-delete-icon" aria-hidden="true"><Trash size={18} weight="bold" /></span>
-      </button>
-      <div
-        className="message-editor-row"
-        style={{ transform: `translateX(${offset}px)` }}
-        onPointerDown={(event) => {
-          if ((event.target as HTMLElement).closest("button")) return;
-          startX.current = event.clientX;
-          startOffset.current = offset;
-          event.currentTarget.setPointerCapture(event.pointerId);
-        }}
-        onPointerMove={(event) => {
-          if (startX.current === null) return;
-          const distance = event.clientX - startX.current;
-          setOffset(Math.max(-DELETE_REVEAL, Math.min(0, startOffset.current + distance)));
-        }}
-        onPointerUp={(event) => {
-          if (startX.current === null) return;
-          const distance = event.clientX - startX.current;
-          setOffset(distance < -28 || offset < -DELETE_REVEAL / 2 ? -DELETE_REVEAL : 0);
-          startX.current = null;
-        }}
-        onPointerCancel={() => {
-          setOffset(offset < -DELETE_REVEAL / 2 ? -DELETE_REVEAL : 0);
-          startX.current = null;
-        }}
-      >
+    <SwipeAction ref={swipeRef} className="editor-swipe-action" rightActions={actions} closeOnAction>
+      <div className="message-editor-row">
         <Picker
           columns={[senderOptions]}
           value={[item.senderId]}
@@ -124,7 +121,7 @@ function MessageEditorRow({ item, participants, assetUrls, onChange, onDelete }:
           />
         </label>
       </div>
-    </div>
+    </SwipeAction>
   );
 }
 
@@ -137,15 +134,31 @@ export function MessageEditor({
   onChangeMessage,
   onEditTime,
   onDelete,
+  onMoveMessage,
 }: MessageEditorProps) {
+  const [swipeRevision, setSwipeRevision] = useState(0);
   const current = participants.find((person) => person.id === currentParticipantId);
   const other = participants.find((person) => person.id !== currentParticipantId);
+  const moveMessageAndResetSwipe = (id: string, direction: "up" | "down") => {
+    onMoveMessage(id, direction);
+    setSwipeRevision((revision) => revision + 1);
+  };
 
   return (
     <div className="content-editor">
       <div className="message-editor-list">
         {items.map((item) => item.kind === "time-divider" ? (
-          <div className={`time-segment-editor ${item.requiresConfirmation ? "requires-confirmation" : ""}`} key={item.id}>
+          <SwipeAction
+            className="editor-swipe-action time-segment-swipe"
+            rightActions={[{
+              key: "delete",
+              color: "var(--surface)",
+              text: <SwipeIcon label="删除时间段" tone="danger"><Trash size={18} weight="bold" /></SwipeIcon>,
+              onClick: () => onDelete(item.id),
+            }]}
+            key={item.id}
+          >
+          <div className={`time-segment-editor ${item.requiresConfirmation ? "requires-confirmation" : ""}`}>
             <button
               className="segment-add segment-add-other"
               disabled={!other}
@@ -170,19 +183,23 @@ export function MessageEditor({
               <Plus size={16} weight="bold" />
               <span>我方</span>
             </button>
-            <button className="segment-delete" onClick={() => onDelete(item.id)} aria-label="删除时间段" type="button">
-              <Trash size={16} />
-            </button>
           </div>
+          </SwipeAction>
         ) : (
-          <MessageEditorRow
-            item={item}
-            participants={participants}
-            assetUrls={assetUrls}
-            onChange={(patch) => onChangeMessage(item.id, patch)}
-            onDelete={() => onDelete(item.id)}
-            key={item.id}
-          />
+          (() => {
+            const segmentMessages = items.filter((entry): entry is MessageItem => entry.kind === "message" && entry.timeSegmentId === item.timeSegmentId);
+            const position = segmentMessages.findIndex((entry) => entry.id === item.id);
+            return <MessageEditorRow
+              item={item}
+              participants={participants}
+              assetUrls={assetUrls}
+              onChange={(patch) => onChangeMessage(item.id, patch)}
+              onDelete={() => onDelete(item.id)}
+              onMoveUp={position > 0 ? () => moveMessageAndResetSwipe(item.id, "up") : undefined}
+              onMoveDown={position >= 0 && position < segmentMessages.length - 1 ? () => moveMessageAndResetSwipe(item.id, "down") : undefined}
+              key={`${item.id}-${swipeRevision}`}
+            />;
+          })()
         ))}
         {items.length === 0 ? (
           <div className="content-empty"><ChatCircle size={28} /><strong>还没有时间段</strong><span>先从顶部新增时间，再按左右人物添加气泡。</span></div>

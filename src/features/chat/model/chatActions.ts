@@ -65,6 +65,30 @@ export function addTimeSegment(project: ChatProject, timestamp: string): TimeDiv
   return item;
 }
 
+export function moveMessageWithinTimeSegment(
+  project: ChatProject,
+  messageId: string,
+  direction: "up" | "down",
+): boolean {
+  const message = findMessage(project, messageId);
+  if (!message) return false;
+
+  const messageIndexes = project.content.items.flatMap((item, index) => (
+    item.kind === "message" && item.timeSegmentId === message.timeSegmentId ? [index] : []
+  ));
+  const position = messageIndexes.findIndex((index) => project.content.items[index]?.id === messageId);
+  const targetPosition = direction === "up" ? position - 1 : position + 1;
+  if (position < 0 || targetPosition < 0 || targetPosition >= messageIndexes.length) return false;
+
+  const sourceIndex = messageIndexes[position];
+  const targetIndex = messageIndexes[targetPosition];
+  [project.content.items[sourceIndex], project.content.items[targetIndex]] = [
+    project.content.items[targetIndex],
+    project.content.items[sourceIndex],
+  ];
+  return true;
+}
+
 export function applyTemplate(project: ChatProject, templateId: TemplateId): void {
   const tokens = CHAT_TEMPLATES[templateId];
   project.content.templateId = templateId;

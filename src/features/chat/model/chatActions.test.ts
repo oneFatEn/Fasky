@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject } from "../../../defaultProject";
-import { appendMessageToTimeSegment, applyTemplate, insertChatItem, updateChatProject } from "./chatActions";
+import { appendMessageToTimeSegment, applyTemplate, insertChatItem, moveMessageWithinTimeSegment, updateChatProject } from "./chatActions";
 import { CHAT_TEMPLATES } from "../../../templates";
 
 describe("chat actions", () => {
@@ -61,5 +61,21 @@ describe("chat actions", () => {
     expect(right.senderId).toBe(current);
     expect(left.timeSegmentId).toBe(segment.id);
     expect(right.timeSegmentId).toBe(segment.id);
+  });
+
+  it("moves a message only within its own time segment", () => {
+    const project = createProject("wechat");
+    const messages = project.content.items.filter((item) => item.kind === "message");
+    const first = messages[0];
+    const second = messages[1];
+    expect(first && second).toBeTruthy();
+    if (!first || first.kind !== "message" || !second || second.kind !== "message") return;
+
+    expect(moveMessageWithinTimeSegment(project, second.id, "up")).toBe(true);
+    const reordered = project.content.items.filter((item) => item.kind === "message" && item.timeSegmentId === first.timeSegmentId);
+    expect(reordered.slice(0, 2).map((item) => item.id)).toEqual([second.id, first.id]);
+    expect(moveMessageWithinTimeSegment(project, second.id, "up")).toBe(false);
+    const last = reordered.at(-1);
+    expect(last && moveMessageWithinTimeSegment(project, last.id, "down")).toBe(false);
   });
 });

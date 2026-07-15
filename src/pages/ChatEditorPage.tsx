@@ -24,11 +24,14 @@ import {
   applyTemplate,
   findMessage,
   findParticipant,
+  moveMessageWithinTimeSegment,
   updateChatProject,
 } from "../features/chat/model/chatActions";
 import {
+  clampToReferenceDate,
   formatLocalDate,
   formatLocalDateTime,
+  getReferenceDateMaximum,
   parseLocalDate,
   parseLocalDateTime,
 } from "../features/chat/model/localDateTime";
@@ -69,6 +72,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
   const participants = project.content.participants;
   const pageEstimate = useMemo(() => Math.max(1, Math.ceil(project.content.items.length / 8)), [project.content.items.length]);
   const referenceDate = parseLocalDate(project.content.referenceDate) ?? new Date();
+  const latestAllowedTime = getReferenceDateMaximum(project.content.referenceDate) ?? new Date(2100, 11, 31, 23, 59);
 
   const change = (mutate: (draft: ChatProject) => void) => onChange((current) => updateChatProject(current, mutate));
   const openPicker = (nextPicker: PickerState) => {
@@ -92,10 +96,11 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
 
   const openTimeEditor = (segmentId: string) => {
     const segment = project.content.items.find((item) => item.kind === "time-divider" && item.id === segmentId);
+    const parsed = segment?.kind === "time-divider" ? parseLocalDateTime(segment.timestamp) : undefined;
     openPicker({
       kind: "edit-time",
       segmentId,
-      value: segment?.kind === "time-divider" ? parseLocalDateTime(segment.timestamp) ?? new Date() : new Date(),
+      value: new Date(Math.min((parsed ?? new Date()).getTime(), latestAllowedTime.getTime())),
     });
   };
 
@@ -103,7 +108,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
     if (picker.kind === "reference-date") {
       change((draft) => { draft.content.referenceDate = formatLocalDate(value); });
     } else if (picker.kind === "edit-time") {
-      const timestamp = formatLocalDateTime(value);
+      const timestamp = formatLocalDateTime(clampToReferenceDate(value, project.content.referenceDate));
       change((draft) => {
         const item = draft.content.items.find((entry) => entry.kind === "time-divider" && entry.id === picker.segmentId);
         if (item?.kind === "time-divider") {
@@ -113,7 +118,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
         }
       });
     } else {
-      const timestamp = formatLocalDateTime(value);
+      const timestamp = formatLocalDateTime(clampToReferenceDate(value, project.content.referenceDate));
       change((draft) => {
         addTimeSegment(draft, timestamp);
       });
@@ -135,6 +140,10 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
     const assetId = await saveImage(file);
     if (!assetId) return;
     change((draft) => { draft.content.backgroundAssetId = assetId; });
+  };
+
+  const moveMessage = (id: string, direction: "up" | "down") => {
+    change((draft) => { moveMessageWithinTimeSegment(draft, id, direction); });
   };
 
   return (
@@ -167,7 +176,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               <button className="sheet-reference-date" onClick={() => openPicker({ kind: "reference-date", value: referenceDate })} type="button" aria-label={`设置今日日期，当前为${project.content.referenceDate}`}>
                 <CalendarBlank size={16} weight="bold" /><span>今天</span><strong>{project.content.referenceDate.slice(5)}</strong>
               </button>
-              <button onClick={() => openPicker({ kind: "new-time", value: new Date() })} type="button"><Clock size={16} />时间</button>
+              <button onClick={() => openPicker({ kind: "new-time", value: new Date(Math.min(Date.now(), latestAllowedTime.getTime())) })} type="button"><Clock size={16} />时间</button>
             </>
           ) : undefined}
         >
@@ -181,6 +190,7 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
               onEditTime={openTimeEditor}
               onChangeMessage={(id, patch) => change((draft) => { const item = findMessage(draft, id); if (item) Object.assign(item, patch); })}
               onDelete={deleteItem}
+              onMoveMessage={moveMessage}
             />
           ) : null}
           {tab === "people" ? (
@@ -218,7 +228,11 @@ export function ChatEditorPage({ project, dirty, onChange, onBack, onSave }: Cha
           precision={picker.kind === "reference-date" ? "day" : "minute"}
           title={picker.kind === "reference-date" ? "设置今日日期" : "选择日期和时间"}
           min={new Date(2000, 0, 1)}
-          max={new Date(2100, 11, 31, 23, 59)}
+          max={picker.kind === "reference-date" ? new Date(2100, 11, 31) : latestAllowedTime}
+          renderLabel={(type, value) => {
+            const units: Record<string, string> = { year: "年", month: "月", day: "日", hour: "时", minute: "分", second: "秒", week: "周", "week-day": "日", quarter: "季度", now: "" };
+            return `${value}${units[type] ?? ""}`;
+          }}
           closeOnMaskClick={false}
           onConfirm={confirmPicker}
           onCancel={() => setPickerOpen(false)}

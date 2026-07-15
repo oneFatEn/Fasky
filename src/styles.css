@@ -380,24 +380,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .sheet-body {
   min-height: 0;
   padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .time-segment-editor {
   min-width: 0;
   padding: 7px;
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 54px 44px;
+  grid-template-columns: 54px minmax(0, 1fr) 54px;
   align-items: stretch;
   gap: 5px;
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--surface-strong);
 }
-.message-editor-swipe { position: relative; min-width: 0; border-radius: var(--radius-control); background: var(--surface); overflow: hidden; }
-.message-swipe-delete { position: absolute; inset: 0 0 0 auto; width: 64px; display: grid; place-items: center; background: var(--surface); }
-.message-delete-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: #fff9f6; background: var(--danger); box-shadow: 0 3px 9px color-mix(in srgb, var(--danger) 22%, transparent); line-height: 0; }
+.editor-swipe-action { --background: var(--surface); min-width: 0; border-radius: var(--radius-control); }
+.editor-swipe-action .adm-swipe-action-action-button.adm-button { min-width: 48px; padding: 0 5px; }
+.swipe-action-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; line-height: 0; }
+.swipe-action-icon.is-neutral { color: var(--ink); background: color-mix(in srgb, var(--muted) 22%, var(--surface-strong)); box-shadow: 0 3px 9px rgba(48, 44, 38, .08); }
+.swipe-action-icon.is-danger { color: #fff9f6; background: var(--danger); box-shadow: 0 3px 9px color-mix(in srgb, var(--danger) 22%, transparent); }
 .message-editor-row {
   position: relative;
   min-width: 0;
@@ -410,10 +414,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--accent) 5%, var(--surface-strong));
-  touch-action: pan-y;
-  transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
-.message-editor-swipe.is-revealed .message-editor-row { box-shadow: 0 5px 16px rgba(44, 45, 36, .08); }
 .message-sender-switch { position: relative; width: 52px; height: 52px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: transparent; }
 .message-editor-avatar { display: grid; place-items: center; color: #f8f8f1; background: #70784b; font-size: 15px; font-weight: 800; overflow: hidden; }
 .sender-switch-icon { position: absolute; right: -2px; bottom: -1px; width: 23px; height: 23px; display: grid; place-items: center; border: 2px solid color-mix(in srgb, var(--accent) 5%, var(--surface-strong)); border-radius: 50%; color: #454940; background: #fbfaf7; box-shadow: 0 2px 6px rgba(40, 43, 29, .2); }
@@ -457,7 +458,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .time-segment-editor.requires-confirmation {
   border-color: color-mix(in srgb, var(--danger) 52%, var(--line));
 }
-.segment-add, .segment-delete {
+.segment-add {
   min-height: 48px;
   display: flex;
   flex-direction: column;
@@ -469,7 +470,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   font-weight: 750;
 }
 .segment-add { color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.segment-delete { color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .segment-time {
   min-width: 0;
   min-height: 48px;
@@ -483,6 +483,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .segment-time span { font-size: 10px; font-weight: 800; white-space: nowrap; }
 .segment-time small { max-width: 100%; color: var(--muted); font-size: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.editor-setting-group { padding: 12px; display: grid; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line)); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--accent) 5%, var(--surface-strong)); }
+.setting-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.setting-group-heading > div { min-width: 0; display: grid; gap: 2px; }
+.setting-group-heading strong { font-size: 12px; }
+.setting-group-heading small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.editor-segmented {
+  --segmented-background: var(--surface);
+  --segmented-item-color: var(--muted);
+  --segmented-item-selected-background: var(--accent);
+  --segmented-item-selected-color: #fff9f6;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+.editor-segmented .adm-segmented-item, .editor-segmented .adm-segmented-item-selected, .editor-segmented .adm-segmented-thumb { border-radius: 8px; }
+.editor-segmented .adm-segmented-item-label { min-height: 42px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 750; line-height: 1; }
+.background-upload-control { position: relative; min-height: 54px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: var(--radius-control); color: var(--accent-strong); background: var(--surface); font-size: 11px; font-weight: 750; cursor: pointer; }
+.background-upload-control input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.canvas-editor p { margin: 0; }
 
 .content-empty {
   min-height: 180px;
